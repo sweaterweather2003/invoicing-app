@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Master Inventory Stock Registry Control Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 p-8 font-sans">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b pb-4">
+      <div>
+        <div class="flex items-center gap-2 text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">
+          <i class="fas fa-warehouse"></i> Inventory Logistics Core Hub
+        </div>
+        <h1 class="text-4xl font-black text-gray-900 tracking-tight">
+          Master Stock Registry - <span id="companyTitle" class="text-blue-600">Company Name</span>
+        </h1>
+      </div>
+     
+      <div class="flex flex-wrap gap-3 w-full md:w-auto">
+        <button onclick="exportActiveBrandStockToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-3 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all">
+          <i class="fas fa-file-excel"></i> Export Active Brand Sheet
+        </button>
+        <button onclick="showAddNewProductModal()" class="bg-black text-white font-bold px-5 py-3 rounded-xl text-sm flex items-center gap-2 shadow-sm hover:bg-gray-800 transition-all">
+          <i class="fas fa-plus"></i> Manual Add SKU Item
+        </button>
+        <button onclick="deleteAllProducts()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-3 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all">
+          <i class="fas fa-trash-alt"></i> Purge Storage Matrix
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div class="col-span-12 lg:col-span-8 space-y-6">
+        <div class="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+          <div class="p-4 border-b bg-gray-50 flex items-center gap-3">
+            <i class="fas fa-search text-gray-400"></i>
+            <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Query product listings index matching key descriptors..." class="w-full bg-transparent border-none outline-none text-gray-700 placeholder-gray-400 font-medium text-sm">
+          </div>
+         
+          <div class="overflow-x-auto">
+            <table class="w-full text-left">
+              <thead class="bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                <tr>
+                  <th class="p-4">SKU Product Line Descriptor</th>
+                  <th class="p-4 text-right">Wholesale Rate (₹)</th>
+                  <th class="p-4 text-center">Available Stock</th>
+                  <th class="p-4 text-right">Valuation Net</th>
+                  <th class="p-4 text-center">Lead Framework</th>
+                  <th class="p-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody" class="divide-y text-sm text-gray-700 font-medium"></tbody>
+            </table>
+          </div>
+         
+          <div id="emptyTableState" class="hidden p-12 text-center text-gray-400">
+            <i class="fas fa-box-open text-4xl mb-3 block"></i>
+            No items matched current parameters inside this brand cluster.
+          </div>
+        </div>
+      </div>
+
+      <div class="col-span-12 lg:col-span-4 space-y-6">
+        <div id="syncSection" class="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm">
+          <h2 class="text-base font-black text-gray-900 mb-2 uppercase tracking-wider flex items-center gap-2">
+            <i class="fas fa-sync text-blue-600"></i> Auto-Fetch Store Pipeline
+          </h2>
+          <p class="text-xs text-gray-500 mb-4 leading-relaxed">
+            Synchronize external e-commerce listings straight into target database layers natively bypassing proxy blockages.
+          </p>
+          <div class="space-y-3">
+            <input type="url" id="storeUrlInput" placeholder="e.g., https://tanttu.in or https://wilrichmyer.com" class="w-full p-4 border border-gray-200 rounded-xl focus:border-black text-sm outline-none bg-gray-50">
+            <button onclick="fetchProductsFromLink()" id="syncBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl text-sm transition-all shadow-sm flex items-center justify-center gap-2">
+              <i class="fas fa-cloud-download-alt"></i> Execute Platform Dump
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-gray-900 text-white p-6 rounded-3xl shadow-sm space-y-4">
+          <h3 class="text-xs font-bold text-gray-400 tracking-widest uppercase border-b border-gray-700 pb-2"><i class="fas fa-chart-bar text-orange-500 mr-1"></i> Stock Health Analysis Ledger</h3>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between"><span class="text-gray-400">Total Asset SKUs:</span><span id="statSkuTotal" class="font-bold font-mono">0</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Total Units Pool:</span><span id="statUnitsTotal" class="font-bold font-mono">0 Units</span></div>
+            <div class="flex justify-between border-t border-gray-800 pt-2 text-base"><span class="text-gray-300 font-bold">Aggregate Value:</span><span id="statValueTotal" class="font-bold font-mono text-emerald-400">₹0.00</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add New Product Modal -->
+  <div id="productModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
+      <div class="flex justify-between items-center mb-4 border-b pb-2">
+        <h3 class="text-xl font-black text-gray-900">Configure Stock Line Item</h3>
+        <button onclick="hideAddNewProductModal()" class="text-gray-400 hover:text-black text-lg">✕</button>
+      </div>
+      <form id="newProductForm" onsubmit="saveProductItemAction(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Item Name / Descriptor *</label>
+          <input type="text" id="modalProdName" required placeholder="e.g., Pure Aloe Extract Base" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-black text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Rate (₹ Price) *</label>
+            <input type="number" id="modalProdPrice" required min="0" step="0.01" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-black text-sm font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Stock Vol *</label>
+            <input type="number" id="modalProdStock" required min="0" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-black text-sm font-mono">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Lead Delivery Framework</label>
+          <input type="text" id="modalProdLead" value="3-5 Days" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-black text-sm">
+        </div>
+        <button type="submit" class="w-full py-4 bg-black text-white font-bold rounded-xl text-sm hover:opacity-90 transition-all">
+          Commit Line Asset Entry
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Product Modal -->
+  <div id="editProductModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100">
+      <div class="flex justify-between items-center mb-4 border-b pb-2">
+        <h3 class="text-xl font-black text-gray-900">Edit Product</h3>
+        <button onclick="hideEditProductModal()" class="text-gray-400 hover:text-black text-lg">✕</button>
+      </div>
+      <form id="editProductForm" onsubmit="saveEditedProduct(event)" class="space-y-4">
+        <input type="hidden" id="editDocId">
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Item Name / Descriptor</label>
+          <input type="text" id="editProdName" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-black text-sm">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Rate (₹)</label>
+            <input type="number" id="editProdPrice" step="0.01" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-black text-sm font-mono">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Stock</label>
+            <input type="number" id="editProdStock" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-black text-sm font-mono">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Lead Delivery Framework</label>
+          <input type="text" id="editProdLead" class="w-full p-3 border border-gray-200 rounded-xl outline-none focus:border-black text-sm">
+        </div>
+        <button type="submit" class="w-full py-4 bg-black text-white font-bold rounded-xl text-sm hover:opacity-90 transition-all">
+          Save Changes
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, writeBatch, query, where, orderBy, serverTimestamp, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDO0N82vMalBzbNtNI0qHH-7paw6UQT9zM",
+      authDomain: "invoiding-database.firebaseapp.com",
+      projectId: "invoiding-database",
+      storageBucket: "invoiding-database.firebasestorage.app",
+      messagingSenderId: "652678242016",
+      appId: "1:652678242016:web:eec953d046ae53e7f53a85"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let productsData = [];
+    let currentCompany = { id: 1, name: "Kerabeaute" };
+    let editingProductId = null;
+
+    async function syncContextWorkspaceRegistry() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) currentCompany = JSON.parse(saved);
+     
+      document.getElementById('companyTitle').textContent = currentCompany.name;
+     
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('focus') === 'sync') {
+        document.getElementById('syncSection').classList.add('border-blue-600', 'border-2');
+        document.getElementById('storeUrlInput').focus();
+      }
+      await loadStoredProductsRegistry();
+    }
+
+    async function loadStoredProductsRegistry() {
+      productsData = [];
+      try {
+        const q = query(
+          collection(db, "products"),
+          where("brandId", "==", currentCompany.id),
+          orderBy("timestamp", "desc")
+        );
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((document) => {
+          productsData.push({ id: document.id, ...document.data() });
+        });
+        renderTable();
+      } catch (error) {
+        console.error("Error loading products:", error);
+        if (error.code === 'failed-precondition') {
+          alert("Please create the Firestore index first (link in console). Then refresh.");
+        } else {
+          alert("Could not connect to cloud inventory.");
+        }
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      const emptyState = document.getElementById('emptyTableState');
+      tbody.innerHTML = '';
+
+      if (productsData.length === 0) {
+        emptyState.classList.remove('hidden');
+        updateHealthMetricsReadout(0, 0, 0);
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      let totalUnits = 0;
+      let totalValuationSum = 0;
+
+      productsData.forEach((product) => {
+        const itemValuation = (parseFloat(product.price) || 0) * (parseInt(product.stock) || 0);
+        totalUnits += parseInt(product.stock) || 0;
+        totalValuationSum += itemValuation;
+
+        const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50/50 border-b border-gray-100 transition-all";
+        row.innerHTML = `
+          <td class="p-4 font-bold text-gray-900">${product.name}</td>
+          <td class="p-4 text-right font-mono">₹${Number(product.price).toFixed(2)}</td>
+          <td class="p-4 text-center font-mono">${product.stock}</td>
+          <td class="p-4 text-right font-mono text-gray-900 font-bold">₹${itemValuation.toFixed(2)}</td>
+          <td class="p-4 text-center text-xs text-gray-500 bg-gray-50/30 font-semibold">${product.leadTime || 'N/A'}</td>
+          <td class="p-4 text-center flex gap-2 justify-center">
+            <button onclick="editProduct('${product.id}')" class="w-8 h-8 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 flex items-center justify-center transition-all">
+              <i class="fas fa-pen text-xs"></i>
+            </button>
+            <button onclick="purgeSingleProductRecord('${product.id}')" class="w-8 h-8 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-all">
+              <i class="fas fa-trash-alt text-xs"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      updateHealthMetricsReadout(productsData.length, totalUnits, totalValuationSum);
+    }
+
+    function updateHealthMetricsReadout(skuCount, totalUnits, totalValue) {
+      document.getElementById('statSkuTotal').textContent = skuCount;
+      document.getElementById('statUnitsTotal').textContent = `${totalUnits.toLocaleString()} Units`;
+      document.getElementById('statValueTotal').textContent = '₹' + totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    }
+
+    function filterTable() {
+      const queryText = document.getElementById('searchInput').value.toLowerCase().trim();
+      const rows = document.querySelectorAll('#tableBody tr');
+      rows.forEach((row, idx) => {
+        const name = productsData[idx]?.name.toLowerCase() || '';
+        row.classList.toggle('hidden', !name.includes(queryText));
+      });
+    }
+
+    // Edit Functions
+    window.editProduct = function(docId) {
+      const product = productsData.find(p => p.id === docId);
+      if (!product) return;
+
+      editingProductId = docId;
+      document.getElementById('editDocId').value = docId;
+      document.getElementById('editProdName').value = product.name || '';
+      document.getElementById('editProdPrice').value = product.price || '';
+      document.getElementById('editProdStock').value = product.stock || '';
+      document.getElementById('editProdLead').value = product.leadTime || '3-5 Days';
+
+      document.getElementById('editProductModal').classList.remove('hidden');
+      document.getElementById('editProductModal').classList.add('flex');
+    };
+
+    window.hideEditProductModal = function() {
+      document.getElementById('editProductModal').classList.add('hidden');
+      document.getElementById('editProductModal').classList.remove('flex');
+    };
+
+    window.saveEditedProduct = async function(e) {
+      e.preventDefault();
+      if (!editingProductId) return;
+
+      try {
+        const productRef = doc(db, "products", editingProductId);
+        await updateDoc(productRef, {
+          name: document.getElementById('editProdName').value.trim(),
+          price: parseFloat(document.getElementById('editProdPrice').value) || 0,
+          stock: parseInt(document.getElementById('editProdStock').value) || 0,
+          leadTime: document.getElementById('editProdLead').value.trim() || "3-5 Days"
+        });
+
+        hideEditProductModal();
+        await loadStoredProductsRegistry();
+        alert("✅ Product updated successfully!");
+      } catch (err) {
+        console.error(err);
+        alert("Failed to update product.");
+      }
+    };
+
+    function showAddNewProductModal() {
+      document.getElementById('productModal').classList.remove('hidden');
+      document.getElementById('productModal').classList.add('flex');
+    }
+
+    function hideAddNewProductModal() {
+      document.getElementById('productModal').classList.remove('flex');
+      document.getElementById('productModal').classList.add('hidden');
+      document.getElementById('newProductForm').reset();
+    }
+
+    async function saveProductItemAction(e) {
+      e.preventDefault();
+      const name = document.getElementById('modalProdName').value.trim();
+      const price = parseFloat(document.getElementById('modalProdPrice').value) || 0;
+      const stock = parseInt(document.getElementById('modalProdStock').value) || 0;
+      const leadTime = document.getElementById('modalProdLead').value.trim();
+
+      try {
+        await addDoc(collection(db, "products"), {
+          brandId: currentCompany.id,
+          name,
+          price,
+          stock,
+          leadTime: leadTime || "3-5 Days",
+          timestamp: serverTimestamp()
+        });
+        hideAddNewProductModal();
+        await loadStoredProductsRegistry();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to save product.");
+      }
+    }
+
+    async function purgeSingleProductRecord(docId) {
+      if (confirm("Confirm removal of this stock item?")) {
+        try {
+          await deleteDoc(doc(db, "products", docId));
+          await loadStoredProductsRegistry();
+        } catch (err) {
+          alert("Failed to delete item.");
+        }
+      }
+    }
+
+    async function deleteAllProducts() {
+      if (confirm(`CRITICAL DELETION: Wipe ALL inventory for ${currentCompany.name}?`)) {
+        try {
+          const q = query(collection(db, "products"), where("brandId", "==", currentCompany.id));
+          const snapshot = await getDocs(q);
+          const batch = writeBatch(db);
+          snapshot.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+          await loadStoredProductsRegistry();
+        } catch (err) {
+          alert("Failed to purge all items.");
+        }
+      }
+    }
+
+    function exportActiveBrandStockToExcel() {
+      if (productsData.length === 0) return alert("No active data records.");
+     
+      const mapping = productsData.map(p => ({
+        "Product Name Descriptor": p.name,
+        "Unit Wholesale Price (INR)": p.price,
+        "Available Warehouse Volume Count": p.stock,
+        "Calculated Net Asset Valuation": (p.price || 0) * (p.stock || 0),
+        "Supply Chain Lead Framework Time": p.leadTime
+      }));
+      const worksheet = XLSX.utils.json_to_sheet(mapping);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Stock Inventory Registry");
+      const fileName = `${currentCompany.name.toLowerCase().replace(/\s+/g, '_')}_stock_ledger.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+    }
+
+    window.handleWooCommerceJSONP = async function(data) {
+      const syncBtn = document.getElementById('syncBtn');
+      try {
+        let items = Array.isArray(data) ? data : (data.products || []);
+        if (items.length === 0) throw new Error("Empty dataset");
+        const batch = writeBatch(db);
+        let count = 0;
+        items.forEach(p => {
+          let parsedPrice = 0;
+          if (p.prices?.price) {
+            parsedPrice = parseFloat(p.prices.price) / (p.prices.currency_minor_unit === 2 ? 100 : 1);
+          } else if (p.variants?.[0]?.price) {
+            parsedPrice = parseFloat(p.variants[0].price);
+          }
+          const prodRef = doc(collection(db, "products"));
+          batch.set(prodRef, {
+            brandId: currentCompany.id,
+            name: p.name || p.title || "Unnamed Product",
+            price: parsedPrice || 0,
+            stock: p.is_in_stock !== false ? 25 : 0,
+            leadTime: "3-5 Days",
+            timestamp: serverTimestamp()
+          });
+          count++;
+        });
+        await batch.commit();
+        alert(`✅ Successfully synced ${count} products to cloud!`);
+        document.getElementById('storeUrlInput').value = "";
+        await loadStoredProductsRegistry();
+      } catch (err) {
+        console.error(err);
+        alert("Sync failed. Check console.");
+      } finally {
+        syncBtn.disabled = false;
+        syncBtn.innerHTML = `<i class="fas fa-cloud-download-alt"></i> Execute Platform Dump`;
+        const oldScript = document.getElementById('jsonpContainerTag');
+        if (oldScript) oldScript.remove();
+      }
+    };
+
+    window.fetchProductsFromLink = function() {
+      let rawUrl = document.getElementById('storeUrlInput').value.trim();
+      if (!rawUrl) return alert("Please enter a valid store URL.");
+      if (/^http:\/\//i.test(rawUrl)) rawUrl = rawUrl.replace(/^http:\/\//i, 'https://');
+      else if (!/^https:\/\//i.test(rawUrl)) rawUrl = 'https://' + rawUrl;
+      const syncBtn = document.getElementById('syncBtn');
+      syncBtn.disabled = true;
+      syncBtn.innerHTML = `<i class="fas fa-spinner fa-spin mr-1"></i> Interrogating Platform...`;
+      try {
+        const url = new URL(rawUrl);
+        const baseUrl = url.origin;
+        const oldScript = document.getElementById('jsonpContainerTag');
+        if (oldScript) oldScript.remove();
+        const scriptNode = document.createElement('script');
+        scriptNode.id = 'jsonpContainerTag';
+        scriptNode.src = `${baseUrl}/wp-json/wc/store/v1/products?per_page=100&_jsonp=handleWooCommerceJSONP`;
+       
+        scriptNode.onerror = () => {
+          alert("Connection failed. Store must support WooCommerce public API.");
+          syncBtn.disabled = false;
+          syncBtn.innerHTML = `<i class="fas fa-cloud-download-alt"></i> Execute Platform Dump`;
+        };
+        document.head.appendChild(scriptNode);
+      } catch (err) {
+        alert("Invalid URL format.");
+        syncBtn.disabled = false;
+        syncBtn.innerHTML = `<i class="fas fa-cloud-download-alt"></i> Execute Platform Dump`;
+      }
+    };
+
+    // Make all functions globally available
+    window.showAddNewProductModal = showAddNewProductModal;
+    window.hideAddNewProductModal = hideAddNewProductModal;
+    window.saveProductItemAction = saveProductItemAction;
+    window.purgeSingleProductRecord = purgeSingleProductRecord;
+    window.deleteAllProducts = deleteAllProducts;
+    window.exportActiveBrandStockToExcel = exportActiveBrandStockToExcel;
+    window.filterTable = filterTable;
+    window.fetchProductsFromLink = window.fetchProductsFromLink;
+    window.editProduct = editProduct;
+    window.hideEditProductModal = hideEditProductModal;
+    window.saveEditedProduct = saveEditedProduct;
+
+    window.onload = syncContextWorkspaceRegistry;
+  </script>
+</body>
+</html>

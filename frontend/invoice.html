@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Corporate Document Control Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <style>
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printableArea, #printableArea * {
+        visibility: visible;
+      }
+      #printableArea {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 40px 50px;
+        background: white;
+      }
+      .no-print {
+        display: none !important;
+      }
+      input, select {
+        border: none !important;
+        background: transparent !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 font-sans">
+  <div class="max-w-7xl mx-auto p-8">
+    <div class="flex items-center justify-between mb-8 no-print">
+      <div class="flex items-center gap-3">
+        <button onclick="location.href='dashboard.html'" class="w-10 h-10 bg-white border rounded-xl flex items-center justify-center hover:bg-gray-100 transition-all shadow-sm">
+          <i class="fas fa-arrow-left text-gray-600"></i>
+        </button>
+        <h1 class="text-4xl font-black text-gray-900 tracking-tight" id="documentTitle">Document Studio</h1>
+      </div>
+      <span id="docTypeBadge" class="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-blue-100 text-blue-800">FINANCIAL ENGINE</span>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+ 
+      <!-- MAIN INVOICE CONTENT -->
+      <div class="col-span-12 lg:col-span-8">
+        <div id="printableArea" class="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
+          <div class="flex gap-6 mb-8">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">Company Logo</label>
+              <div id="logoContainer" class="w-24 h-24 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center overflow-hidden bg-gray-50"></div>
+            </div>
+            <div class="flex-1">
+              <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">Issuing Entity Name</label>
+              <input id="companyName" type="text" readonly class="w-full p-4 border bg-gray-50 border-gray-200 rounded-2xl font-bold text-lg text-gray-900 outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">Document Configuration Profile</label>
+              <select id="docType" onchange="updateDocumentType()" class="w-full p-4 border-2 border-gray-200 rounded-2xl font-semibold text-gray-700 focus:border-black outline-none transition-all bg-white">
+                <option value="invoice">Invoice (Accounts Receivable - Decreases Stock)</option>
+                <option value="proforma">Proforma Invoice (Pre-Fulfillment Bill - Decreases Stock)</option>
+                <option value="purchase_order">Purchase Order (Addition to Inventory - Increases Stock)</option>
+                <option value="credit_note">Credit Note (Balance Write-down - Increases Stock)</option>
+                <option value="debit_note">Debit Note (Ledger Upward Adjustment - Decreases Stock)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase mb-2" id="numberLabel">Document Serial Sequence Identifier</label>
+              <input id="docNumber" type="text" value="DOC-2026-001" class="w-full p-4 border-2 border-gray-200 rounded-2xl font-mono focus:border-black outline-none transition-all">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase mb-2" id="partyLabel">Target Customer / Client Entity</label>
+              <select id="clientSelect" onchange="handleClientSelectChange()" class="w-full p-4 border border-gray-200 rounded-2xl bg-white focus:border-black outline-none transition-all">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">Client Email <span class="text-red-500">*</span></label>
+              <input id="clientEmail" type="email" class="w-full p-4 border border-gray-200 rounded-2xl focus:border-black outline-none" placeholder="client@example.com">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase mb-2">GST Jurisdiction / Tax Profile</label>
+              <select id="stateSelect" onchange="calculateTotal()" class="w-full p-4 border border-gray-200 rounded-2xl bg-white focus:border-black outline-none transition-all">
+                <option value="0">0% - Exempt / Nil Rated</option>
+                <option value="5">5% - Merit Rate (Essentials, Food, Agri)</option>
+                <option value="12">12% - Specific Items</option>
+                <option value="18" selected>18% - Standard Rate (Most Common)</option>
+                <option value="28">28% - Luxury / Sin Goods</option>
+                <option value="40">40% - De-merit / Luxury Cars, Tobacco etc.</option>
+                <option value="3">3% - Gold, Silver & Jewellery</option>
+                <option value="0.25">0.25% - Rough Diamonds</option>
+                <option value="DOM">Intra-State (CGST + SGST) - Auto Split</option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">Select GST slab. Per-row tax % in table + jurisdiction base will be added.</p>
+            </div>
+          </div>
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-black text-gray-900 text-lg uppercase tracking-wider">Line Items Ledger Table</h3>
+            <button onclick="showAddProductModal()" class="no-print bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
+              <i class="fas fa-plus"></i> Add from Inventory
+            </button>
+          </div>
+     
+          <div class="overflow-x-auto border border-gray-200 rounded-2xl mb-4 shadow-sm">
+            <table class="w-full" id="itemsTable">
+              <thead>
+                <tr class="bg-gray-50 border-b border-gray-200 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <th class="p-4">Description of Goods or Services</th>
+                  <th class="p-4 w-24 text-center">Qty</th>
+                  <th class="p-4 w-32 text-right">Rate (₹)</th>
+                  <th class="p-4 w-24 text-center">Tax %</th>
+                  <th class="p-4 w-36 text-right">Extended Net</th>
+                  <th class="p-4 w-16 text-center">Delete</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 font-medium">
+              </tbody>
+            </table>
+          </div>
+          <button id="addItemBtn" onclick="addItemRow()" class="no-print bg-black text-white px-6 py-3 rounded-xl font-bold text-sm transition-all hover:bg-gray-800 shadow-sm flex items-center gap-1">
+            <i class="fas fa-plus text-xs"></i> Append Item Line
+          </button>
+          <div class="mt-10 border-t border-gray-100 pt-6 flex justify-end">
+            <div class="w-80 space-y-3 text-sm text-gray-600">
+              <div class="flex justify-between items-center">
+                <span class="font-semibold">Subtotal Valuation</span>
+                <span id="subtotal" class="font-mono text-gray-900 text-base font-bold">₹0.00</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="font-semibold">Calculated GST / Surcharge</span>
+                <span id="taxAmount" class="font-mono text-gray-900 text-base font-bold">₹0.00</span>
+              </div>
+              <div class="flex justify-between items-center border-t border-dashed border-gray-300 pt-3">
+                <span class="text-base font-black text-gray-900 uppercase">Gross Final Aggregate</span>
+                <span id="grandTotal" class="font-mono text-2xl font-black text-gray-900">₹0.00</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- SIDEBAR -->
+      <div class="col-span-12 lg:col-span-4 space-y-6 no-print">
+        <div class="bg-white rounded-3xl border border-gray-200 shadow-sm p-6">
+          <h3 class="font-black text-gray-900 uppercase tracking-wider mb-4 border-b pb-2 text-sm">Action Dispatcher Panel</h3>
+          <div class="space-y-3">
+            <button id="primaryActionBtn" onclick="commitDocumentToConsoleLog()" class="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
+              <i class="fas fa-save"></i> Execute & Log Document
+            </button>
+          
+            <button onclick="sendInvoiceByEmail()" class="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-sm flex items-center justify-center gap-2">
+              <i class="fas fa-paper-plane"></i> Save & Send via Email
+            </button>
+          
+            <button onclick="window.print()" class="w-full py-4 border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
+              <i class="fas fa-print"></i> Generate Local Print / PDF
+            </button>
+            <button onclick="location.href='dashboard.html'" class="w-full py-3 text-xs border border-gray-300 text-gray-500 font-semibold rounded-xl hover:bg-gray-50 transition-all text-center">
+              Abort Action & Drop Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add New Client Modal -->
+  <div id="addClientModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl max-w-md w-full p-8">
+      <h3 class="text-xl font-bold mb-6">Add New Client</h3>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Client Name *</label>
+          <input id="newClientName" type="text" class="w-full p-4 border border-gray-200 rounded-2xl focus:border-black outline-none" placeholder="Full Name / Company">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Email</label>
+            <input id="newClientEmail" type="email" class="w-full p-4 border border-gray-200 rounded-2xl focus:border-black outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Phone</label>
+            <input id="newClientPhone" type="tel" class="w-full p-4 border border-gray-200 rounded-2xl focus:border-black outline-none">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold uppercase text-gray-400 mb-1">Group / Category</label>
+          <input id="newClientGroup" type="text" value="General" class="w-full p-4 border border-gray-200 rounded-2xl focus:border-black outline-none">
+        </div>
+      </div>
+      <div class="flex gap-3 mt-8">
+        <button onclick="hideAddClientModal()" class="flex-1 py-4 border border-gray-300 rounded-2xl font-medium">Cancel</button>
+        <button onclick="saveNewClient()" class="flex-1 py-4 bg-black text-white rounded-2xl font-bold">Save Client</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Product Modal -->
+  <div id="addProductModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-8 max-h-[90vh] overflow-hidden flex flex-col">
+      <h3 class="text-xl font-bold mb-4">Add Product from Inventory</h3>
+      <input id="searchProducts" type="text" placeholder="Search products..."
+             class="w-full border border-gray-300 rounded-2xl px-4 py-3 mb-4 focus:border-emerald-500 outline-none" onkeyup="filterProducts()">
+      <div id="productList" class="flex-1 overflow-auto pr-2"></div>
+      <button onclick="hideAddProductModal()" class="mt-6 w-full py-4 border border-gray-300 rounded-2xl font-medium">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDO0N82vMalBzbNtNI0qHH-7paw6UQT9zM",
+      authDomain: "invoiding-database.firebaseapp.com",
+      databaseURL: "https://invoiding-database-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "invoiding-database",
+      storageBucket: "invoiding-database.firebasestorage.app",
+      messagingSenderId: "652678242016",
+      appId: "1:652678242016:web:eec953d046ae53e7f53a85"
+    };
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    const firestore = firebase.firestore();
+    let activeCompany = { id: 1, name: "Kerabeaute", logo: "kerabeaute_logo.png", color: "#3b82f6" };
+    let allProducts = [];
+    let allClients = [];
+
+    // ==================== CLIENTS LOGIC ====================
+    async function loadClientsForInvoice() {
+      allClients = [];
+      try {
+        const snapshot = await firestore.collection("clients").where("brandId", "==", activeCompany.id).get();
+        snapshot.forEach(doc => allClients.push({ id: doc.id, ...doc.data() }));
+      } catch (e) {
+        console.error("Error loading clients:", e);
+      }
+      renderClientSelect();
+    }
+
+    function renderClientSelect() {
+      const select = document.getElementById('clientSelect');
+      let html = `<option value="">Choose Client</option>`;
+      html += `<option value="add_new">+ Add New Client</option>`;
+      allClients.forEach(c => {
+        html += `<option value="${c.id}" data-email="${c.email || ''}">${c.name} ${c.email ? `(${c.email})` : ''}</option>`;
+      });
+      select.innerHTML = html;
+    }
+
+    window.handleClientSelectChange = function() {
+      const select = document.getElementById('clientSelect');
+      if (select.value === "add_new") {
+        showAddClientModal();
+        select.value = "";
+      } else if (select.value) {
+        const option = select.options[select.selectedIndex];
+        const email = option.getAttribute('data-email');
+        if (email) document.getElementById('clientEmail').value = email;
+      }
+    };
+
+    function showAddClientModal() {
+      document.getElementById('addClientModal').classList.remove('hidden');
+      document.getElementById('addClientModal').classList.add('flex');
+    }
+
+    function hideAddClientModal() {
+      document.getElementById('addClientModal').classList.add('hidden');
+      document.getElementById('addClientModal').classList.remove('flex');
+    }
+
+    async function saveNewClient() {
+      const name = document.getElementById('newClientName').value.trim();
+      if (!name) return alert("Client name is required");
+      try {
+        await firestore.collection("clients").add({
+          brandId: activeCompany.id,
+          name: name,
+          email: document.getElementById('newClientEmail').value.trim(),
+          phone: document.getElementById('newClientPhone').value.trim(),
+          group: document.getElementById('newClientGroup').value.trim() || "General",
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert("✅ New client saved!");
+        hideAddClientModal();
+        await loadClientsForInvoice();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to save client.");
+      }
+    }
+
+    // ==================== ORIGINAL FUNCTIONS ====================
+    function syncInterfaceContext() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) {
+        activeCompany = JSON.parse(saved);
+      }
+      document.getElementById('companyName').value = activeCompany.name;
+      document.getElementById('logoContainer').innerHTML = `<img src="${activeCompany.logo}" class="max-w-full max-h-full object-contain">`;
+ 
+      const themeColor = activeCompany.color || '#3b82f6';
+      const actionBtn = document.getElementById('addItemBtn');
+      if (actionBtn) actionBtn.style.backgroundColor = themeColor;
+      const urlParams = new URLSearchParams(window.location.search);
+      const documentTypeMode = urlParams.get('type') || 'invoice';
+ 
+      document.getElementById('docType').value = documentTypeMode;
+      updateDocumentType();
+      addItemRow();
+    }
+    function updateDocumentType() {
+      const selectedType = document.getElementById('docType').value;
+      const title = document.getElementById('documentTitle');
+      const badge = document.getElementById('docTypeBadge');
+      const numberLabel = document.getElementById('numberLabel');
+      const partyLabel = document.getElementById('partyLabel');
+      const compliance = document.getElementById('complianceHelpText');
+      const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      let serialPrefix = "INV";
+      if (selectedType === 'invoice') {
+        title.textContent = "New Customer Invoice";
+        badge.textContent = "A/R Ledger Statement";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-blue-100 text-blue-800";
+        numberLabel.textContent = "Invoice Serial Number Reference";
+        partyLabel.textContent = "Target Customer / Client Entity";
+        compliance.textContent = "Invoice Mode: Direct reduction to stock counts. Directly impacts profit reporting structures.";
+        serialPrefix = "INV";
+      } else if (selectedType === 'proforma') {
+        title.textContent = "New Proforma Invoice Statement";
+        badge.textContent = "Pre-Fulfillment Forecast";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-indigo-100 text-indigo-800";
+        numberLabel.textContent = "Proforma Reference Identifier";
+        partyLabel.textContent = "Prospect / Customer Account Link";
+        compliance.textContent = "Proforma Mode: Preliminary bill that decreases available stock metrics.";
+        serialPrefix = "PRO";
+      } else if (selectedType === 'purchase_order') {
+        title.textContent = "New Corporate Purchase Order";
+        badge.textContent = "Inbound Supply Inflow";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-emerald-100 text-emerald-800";
+        numberLabel.textContent = "Purchase Order Sequence ID";
+        partyLabel.textContent = "Target Supplier / Vendor Entity";
+        compliance.textContent = "Purchase Order Mode: Direct addition to stock counts.";
+        serialPrefix = "ORD";
+      } else if (selectedType === 'credit_note') {
+        title.textContent = "Issue Corporate Credit Note";
+        badge.textContent = "Balance Adjustment Pool";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-red-100 text-red-800";
+        numberLabel.textContent = "Credit Note Serial Tracking Reference";
+        partyLabel.textContent = "Debtor Customer Account Registry Link";
+        compliance.textContent = "Credit Note Mode: Increases available warehouse inventory counts.";
+        serialPrefix = "CRN";
+      } else if (selectedType === 'debit_note') {
+        title.textContent = "Issue Corporate Debit Note";
+        badge.textContent = "Receivable Expansion Pool";
+        badge.className = "px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-cyan-100 text-cyan-800";
+        numberLabel.textContent = "Debit Note Tracking Reference ID";
+        partyLabel.textContent = "Associated Customer / Target Vendor Account";
+        compliance.textContent = "Debit Note Mode: Upward ledger balance expansion.";
+        serialPrefix = "DBN";
+      }
+      document.getElementById('docNumber').value = `${serialPrefix}-${dateStr}-01`;
+    }
+    function addItemRow() {
+      const tbody = document.querySelector('#itemsTable tbody');
+      const row = document.createElement('tr');
+      row.className = "hover:bg-gray-50/50 transition-colors group";
+      row.innerHTML = `
+        <td class="p-3"><input type="text" placeholder="Description of goods..." class="w-full p-2.5 border border-gray-200 rounded-xl bg-white outline-none focus:border-black font-medium text-sm text-gray-900"></td>
+        <td class="p-3"><input type="number" value="1" min="1" oninput="calculateTotal()" class="qtyInput w-full p-2.5 border border-gray-200 rounded-xl text-center outline-none focus:border-black font-mono text-sm text-gray-900"></td>
+        <td class="p-3"><input type="number" value="0" min="0" step="0.01" oninput="calculateTotal()" class="rateInput w-full p-2.5 border border-gray-200 rounded-xl text-right outline-none focus:border-black font-mono text-sm text-gray-900"></td>
+        <td class="p-3"><input type="number" value="18" min="0" max="100" step="0.01" oninput="calculateTotal()" class="taxInput w-full p-2.5 border border-gray-200 rounded-xl text-center outline-none focus:border-black font-mono text-sm text-gray-900"></td>
+        <td class="p-3 text-right font-mono text-gray-900 font-bold text-sm tracking-tight"><span class="rowTotalAmount">₹0.00</span></td>
+        <td class="p-3 text-center"><button onclick="removeLineItemRow(this)" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all"><i class="fas fa-trash-alt text-sm"></i></button></td>
+      `;
+      tbody.appendChild(row);
+      calculateTotal();
+    }
+    function removeLineItemRow(btn) {
+      const row = btn.closest('tr');
+      const tbody = document.querySelector('#itemsTable tbody');
+      if (tbody.rows.length > 1) {
+        row.remove();
+        calculateTotal();
+      } else {
+        alert("At least one transactional line item must remain present.");
+      }
+    }
+    function calculateTotal() {
+      const rows = document.querySelectorAll('#itemsTable tbody tr');
+      let subtotalSum = 0;
+      let calculatedTaxSum = 0;
+      const state = document.getElementById('stateSelect').value;
+      let jurisdictionalTaxBase = 0;
+      if (state === 'DOM') jurisdictionalTaxBase = 18.00;
+      else if (state === '5') jurisdictionalTaxBase = 5;
+      else if (state === '12') jurisdictionalTaxBase = 12;
+      else if (state === '18') jurisdictionalTaxBase = 18;
+      else if (state === '28') jurisdictionalTaxBase = 28;
+      else if (state === '40') jurisdictionalTaxBase = 40;
+      else if (state === '3') jurisdictionalTaxBase = 3;
+      else if (state === '0.25') jurisdictionalTaxBase = 0.25;
+      else jurisdictionalTaxBase = parseFloat(state) || 0;
+      rows.forEach(row => {
+        const qtyEl = row.querySelector('.qtyInput');
+        const rateEl = row.querySelector('.rateInput');
+        const taxEl = row.querySelector('.taxInput');
+        if (!qtyEl || !rateEl || !taxEl) return;
+        const qty = parseFloat(qtyEl.value) || 0;
+        const rate = parseFloat(rateEl.value) || 0;
+        const baselineRowTaxInput = parseFloat(taxEl.value) || 0;
+        const netRowAmount = qty * rate;
+        const aggregateTaxPercentage = baselineRowTaxInput + jurisdictionalTaxBase;
+        const rowTaxAmountValue = netRowAmount * (aggregateTaxPercentage / 100);
+        row.querySelector('.rowTotalAmount').textContent = '₹' + netRowAmount.toFixed(2);
+        subtotalSum += netRowAmount;
+        calculatedTaxSum += rowTaxAmountValue;
+      });
+      const grandTotalSum = subtotalSum + calculatedTaxSum;
+      document.getElementById('subtotal').textContent = '₹' + subtotalSum.toFixed(2);
+      document.getElementById('taxAmount').textContent = '₹' + calculatedTaxSum.toFixed(2);
+      document.getElementById('grandTotal').textContent = '₹' + grandTotalSum.toFixed(2);
+    }
+    async function saveDocumentToFirebase(docData) {
+      try {
+        const companyRef = db.ref('companies/' + activeCompany.id);
+        const newRef = companyRef.child('documents').push();
+        await newRef.set(docData);
+        return true;
+      } catch (error) {
+        console.error("❌ SAVE FAILED:", error);
+        alert("Save failed! Check console.");
+        return false;
+      }
+    }
+
+    // ==================== FUZZY STOCK ADJUSTMENT ====================
+    function fuzzyMatch(str1, str2) {
+      if (!str1 || !str2) return false;
+      const s1 = str1.toLowerCase().trim();
+      const s2 = str2.toLowerCase().trim();
+      return s1.includes(s2) || s2.includes(s1);
+    }
+
+    async function adjustStockForDocument(items, docType) {
+      const shouldDecrease = ['invoice', 'proforma', 'debit_note'].includes(docType);
+      const shouldIncrease = ['purchase_order', 'credit_note'].includes(docType);
+      const snapshot = await firestore.collection("products").where("brandId", "==", activeCompany.id).get();
+      const batch = firestore.batch();
+
+      for (const item of items) {
+        snapshot.forEach(doc => {
+          const product = doc.data();
+          if (fuzzyMatch(product.name, item.description)) {
+            const currentStock = parseInt(product.stock) || 0;
+            let newStock = currentStock;
+            if (shouldDecrease) newStock = Math.max(0, currentStock - item.qty);
+            if (shouldIncrease) newStock = currentStock + item.qty;
+            if (newStock !== currentStock) {
+              batch.update(doc.ref, { stock: newStock });
+            }
+          }
+        });
+      }
+      await batch.commit();
+    }
+
+    // ==================== SAVE DOCUMENT (Used by both buttons) ====================
+    async function saveAndLogDocument(isEmailSend = false) {
+      const type = document.getElementById('docType').value;
+      const serialNum = document.getElementById('docNumber').value;
+      const grandTotalString = document.getElementById('grandTotal').textContent;
+      const clientSelect = document.getElementById('clientSelect');
+      const clientName = clientSelect.options[clientSelect.selectedIndex]?.text || "Direct Corporate Contact";
+      const rows = document.querySelectorAll('#itemsTable tbody tr');
+      const items = [];
+      rows.forEach(row => {
+        const descInput = row.querySelector('td:nth-child(1) input');
+        const description = descInput ? descInput.value.trim() : '';
+        const qty = parseInt(row.querySelector('.qtyInput').value) || 0;
+        const rate = parseFloat(row.querySelector('.rateInput').value) || 0;
+        const tax = parseFloat(row.querySelector('.taxInput').value) || 0;
+        if (description && qty > 0) {
+          items.push({ description, qty, rate, tax });
+        }
+      });
+
+      const docData = {
+        ref: serialNum,
+        type: type,
+        counterparty: clientName,
+        value: grandTotalString,
+        items: items,
+        timestamp: new Date().toISOString(),
+        state: isEmailSend ? "Sent via Email" : (type === "invoice" || type === "proforma") ? "Issued" : "Committed"
+      };
+
+      const saveSuccess = await saveDocumentToFirebase(docData);
+      if (saveSuccess) {
+        try {
+          await adjustStockForDocument(items, type);
+        } catch (e) {
+          console.warn("Stock adjustment skipped");
+        }
+        return true;
+      }
+      return false;
+    }
+
+    function commitDocumentToConsoleLog() {
+      saveAndLogDocument(false).then(success => {
+        if (success) {
+          alert(`✅ Transaction saved successfully!`);
+          location.href = 'history.html';
+        }
+      });
+    }
+
+    // ==================== EMAIL + SAVE ====================
+    window.sendInvoiceByEmail = async function() {
+      const clientEmail = document.getElementById('clientEmail').value.trim();
+      if (!clientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+        return alert("Please enter a valid client email address.");
+      }
+
+      // First save to history
+      const saved = await saveAndLogDocument(true);
+      if (!saved) return;
+
+      // Then send email (your original logic)
+      const docNumber = document.getElementById('docNumber').value;
+      const companyName = document.getElementById('companyName').value;
+      const grandTotal = parseFloat(document.getElementById('grandTotal').textContent.replace(/[^0-9.]/g, '')) || 0;
+      const subtotal = parseFloat(document.getElementById('subtotal').textContent.replace(/[^0-9.]/g, '')) || 0;
+      const taxAmount = parseFloat(document.getElementById('taxAmount').textContent.replace(/[^0-9.]/g, '')) || 0;
+      const rows = document.querySelectorAll('#itemsTable tbody tr');
+      const items = [];
+      rows.forEach(row => {
+        const descInput = row.querySelector('td:nth-child(1) input');
+        const description = descInput ? descInput.value.trim() : 'Item';
+        const qty = parseInt(row.querySelector('.qtyInput').value) || 0;
+        const rate = parseFloat(row.querySelector('.rateInput').value) || 0;
+        if (description && qty > 0) {
+          items.push({ name: description, qty: qty, price: rate });
+        }
+      });
+      const dynamicData = {
+        type: "Invoice",
+        number: docNumber,
+        companyName: companyName,
+        logoUrl: "",
+        items: items,
+        subtotal: subtotal,
+        taxAmount: taxAmount,
+        total: grandTotal
+      };
+      try {
+        const response = await fetch('/api/send-document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toEmail: clientEmail,
+            dynamicData: dynamicData
+          })
+        });
+        const result = await response.json();
+        if (result.success) {
+          alert(`✅ Invoice ${docNumber} sent successfully to ${clientEmail} and saved to history!`);
+          location.href = 'history.html';
+        } else {
+          alert("Email failed: " + (result.error?.message || result.error));
+        }
+      } catch (error) {
+        console.error(error);
+        alert("Email sending failed. Document was saved to history.");
+      }
+    };
+
+    // Product functions (unchanged)
+    async function loadProductsForInvoice() {
+      allProducts = [];
+      try {
+        const snapshot = await firestore.collection("products").where("brandId", "==", activeCompany.id).get();
+        snapshot.forEach(doc => allProducts.push({ id: doc.id, ...doc.data() }));
+      } catch (e) {
+        console.error("Error loading products:", e);
+      }
+    }
+    function showAddProductModal() {
+      loadProductsForInvoice().then(() => renderProductList());
+      document.getElementById('addProductModal').classList.remove('hidden');
+      document.getElementById('addProductModal').classList.add('flex');
+    }
+    function hideAddProductModal() {
+      document.getElementById('addProductModal').classList.add('hidden');
+      document.getElementById('addProductModal').classList.remove('flex');
+    }
+    function renderProductList(filtered = allProducts) {
+      const container = document.getElementById('productList');
+      container.innerHTML = '';
+      if (filtered.length === 0) {
+        container.innerHTML = `<p class="text-center text-gray-400 py-8">No products found</p>`;
+        return;
+      }
+      filtered.forEach((p, index) => {
+        const div = document.createElement('div');
+        div.className = "flex justify-between items-center p-4 hover:bg-gray-50 rounded-2xl cursor-pointer border-b last:border-none";
+        div.innerHTML = `
+          <div>
+            <div class="font-medium">${p.name}</div>
+            <div class="text-sm text-gray-500">₹${Number(p.price || 0).toFixed(2)}</div>
+          </div>
+          <button onclick="addProductToTable(${index}); event.stopImmediatePropagation()" 
+                  class="bg-emerald-600 text-white px-5 py-2 rounded-2xl text-sm font-medium">Add</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+    window.filterProducts = function() {
+      const term = document.getElementById('searchProducts').value.toLowerCase().trim();
+      const filtered = allProducts.filter(p => p.name.toLowerCase().includes(term));
+      renderProductList(filtered);
+    };
+    window.addProductToTable = function(index) {
+      const product = allProducts[index];
+      const tbody = document.querySelector('#itemsTable tbody');
+      const row = document.createElement('tr');
+      row.className = "hover:bg-gray-50/50 transition-colors group";
+      row.innerHTML = `
+        <td class="p-3"><input type="text" value="${product.name}" class="w-full p-2.5 border border-gray-200 rounded-xl bg-white outline-none focus:border-black font-medium text-sm text-gray-900"></td>
+        <td class="p-3"><input type="number" value="1" min="1" oninput="calculateTotal()" class="qtyInput w-full p-2.5 border border-gray-200 rounded-xl text-center outline-none focus:border-black font-mono text-sm text-gray-900"></td>
+        <td class="p-3"><input type="number" value="${product.price || 0}" min="0" step="0.01" oninput="calculateTotal()" class="rateInput w-full p-2.5 border border-gray-200 rounded-xl text-right outline-none focus:border-black font-mono text-sm text-gray-900"></td>
+        <td class="p-3"><input type="number" value="18" min="0" max="100" step="0.01" oninput="calculateTotal()" class="taxInput w-full p-2.5 border border-gray-200 rounded-xl text-center outline-none focus:border-black font-mono text-sm text-gray-900"></td>
+        <td class="p-3 text-right font-mono text-gray-900 font-bold text-sm tracking-tight"><span class="rowTotalAmount">₹0.00</span></td>
+        <td class="p-3 text-center"><button onclick="removeLineItemRow(this)" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all"><i class="fas fa-trash-alt text-sm"></i></button></td>
+      `;
+      tbody.appendChild(row);
+      calculateTotal();
+      hideAddProductModal();
+    };
+
+    window.onload = async function() {
+      await loadClientsForInvoice();
+      syncInterfaceContext();
+    };
+  </script>
+</body>
+</html>

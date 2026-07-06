@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RFQ Pipeline</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="max-w-7xl mx-auto p-8">
+   
+    <!-- HEADER -->
+    <div class="flex items-center justify-between mb-8">
+      <div class="flex items-center gap-4">
+        <button onclick="location.href='dashboard.html'" class="w-10 h-10 flex items-center justify-center rounded-2xl bg-white border border-gray-200 hover:bg-gray-100 transition-all">
+          <i class="fas fa-arrow-left text-gray-600"></i>
+        </button>
+        <div>
+          <h1 class="text-4xl font-bold text-gray-900">RFQ Pipeline</h1>
+          <p class="text-gray-500">Manage inbound & outbound quotations</p>
+        </div>
+      </div>
+     
+      <div class="flex items-center gap-3">
+        <button onclick="location.href='vendor_quotations.html'"
+                class="bg-white border border-gray-300 hover:bg-gray-50 px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold transition-all">
+          <i class="fas fa-history"></i> Approved Ledger
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="flex border-b mb-8">
+      <button onclick="switchTab(0)" id="tab0"
+              class="tab-button px-8 py-4 font-semibold border-b-4 border-emerald-600 text-emerald-700">Inbound (From Vendors)</button>
+      <button onclick="switchTab(1)" id="tab1"
+              class="tab-button px-8 py-4 font-semibold text-gray-500 hover:text-gray-700">Outbound (To Clients)</button>
+    </div>
+
+    <!-- ==================== INBOUND TAB ==================== -->
+    <div id="inboundTab" class="tab-content">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- LEFT: RFQ LIST -->
+        <div class="lg:col-span-7 bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+          <div class="p-6 border-b bg-gray-50 flex justify-between items-center">
+            <h2 class="font-semibold text-lg">Pending Quotations from Vendors</h2>
+            
+            <div class="flex items-center gap-3">
+              <label class="cursor-pointer bg-white border border-gray-300 hover:bg-gray-50 px-5 py-3 rounded-2xl flex items-center gap-2 font-medium transition-all">
+                <i class="fas fa-upload"></i> Upload Excel / CSV
+                <input type="file" id="quoteUpload" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleQuoteUpload(event)">
+              </label>
+              <button onclick="deleteAllPendingRFQs()" 
+                      class="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-medium transition-all">
+                <i class="fas fa-trash-alt"></i> Delete All
+              </button>
+            </div>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead>
+                <tr class="bg-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
+                  <th class="py-5 px-6 text-left">RFQ ID</th>
+                  <th class="py-5 px-6 text-left">Supplier</th>
+                  <th class="py-5 px-6 text-left">Items Summary</th>
+                  <th class="py-5 px-6 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="rfqTableBody" class="divide-y text-gray-700"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- RIGHT: REVIEW PANEL -->
+        <div class="lg:col-span-5 space-y-6">
+          <div id="reviewSheetPlaceholder" class="bg-white border border-gray-200 rounded-3xl p-12 text-center min-h-[500px] flex flex-col items-center justify-center">
+            <i class="fas fa-file-invoice-dollar text-6xl text-gray-300 mb-6"></i>
+            <p class="text-2xl font-semibold text-gray-400">No RFQ Selected</p>
+            <p class="text-gray-500 mt-2">Click any row to review details</p>
+          </div>
+
+          <div id="reviewSheetWorkspace" class="hidden bg-white border border-gray-200 rounded-3xl p-8">
+            <div class="flex justify-between items-start mb-8">
+              <div>
+                <span id="reviewTrackingToken" class="bg-emerald-100 text-emerald-700 px-4 py-1 rounded-2xl text-sm font-bold"></span>
+                <h3 id="reviewSupplierName" class="text-2xl font-bold mt-3"></h3>
+              </div>
+              <div class="text-right">
+                <p class="text-xs text-gray-500">TOTAL</p>
+                <p id="reviewGrandTotal" class="text-4xl font-bold text-emerald-600"></p>
+              </div>
+            </div>
+
+            <table class="w-full text-sm mb-8">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="py-3 px-4 text-left">Description</th>
+                  <th class="py-3 px-4 text-center">Qty</th>
+                  <th class="py-3 px-4 text-right">Rate</th>
+                  <th class="py-3 px-4 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody id="reviewItemsTableBody" class="divide-y"></tbody>
+            </table>
+
+            <div class="flex gap-3">
+              <button onclick="approveAndCommitSelectedQuote()" 
+                      class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-2xl font-semibold flex items-center justify-center gap-2">
+                <i class="fas fa-check-circle"></i> Approve & Commit
+              </button>
+              <button onclick="closeReviewSheet()" 
+                      class="flex-1 border border-gray-300 hover:bg-gray-50 py-4 rounded-2xl font-semibold">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== OUTBOUND TAB ==================== -->
+    <div id="outboundTab" class="tab-content hidden">
+      <div class="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
+        <h2 class="text-2xl font-bold mb-6">Create Quotation for Client</h2>
+       
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Client Name</label>
+            <input id="clientName" type="text" class="w-full border border-gray-300 rounded-2xl px-4 py-3 focus:border-emerald-500 outline-none" placeholder="e.g., Wellness Clinic Delhi">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Client Email</label>
+            <input id="clientEmail" type="email" class="w-full border border-gray-300 rounded-2xl px-4 py-3 focus:border-emerald-500 outline-none" placeholder="client@example.com">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Quotation Reference</label>
+            <input id="quoteRef" type="text" readonly class="w-full border border-gray-300 rounded-2xl px-4 py-3 bg-gray-50 font-mono" value="">
+          </div>
+        </div>
+
+        <button onclick="showAddProductModal()"
+                class="mb-6 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold">
+          <i class="fas fa-plus"></i> Add Product from Inventory
+        </button>
+
+        <table class="w-full mb-8">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="py-3 px-4 text-left">Product</th>
+              <th class="py-3 px-4 text-center">Qty</th>
+              <th class="py-3 px-4 text-right">Rate (₹)</th>
+              <th class="py-3 px-4 text-right">Amount</th>
+              <th class="py-3 px-4 w-12"></th>
+            </tr>
+          </thead>
+          <tbody id="outboundItemsBody" class="divide-y"></tbody>
+        </table>
+
+        <div class="flex justify-end items-center gap-4 mb-8">
+          <span class="text-3xl font-bold text-emerald-600">Total: <span id="outboundTotal">₹0.00</span></span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <button onclick="saveOutboundQuotation()" 
+                  class="bg-black hover:bg-gray-900 text-white py-5 rounded-3xl font-bold text-lg transition-all">
+            Save Quotation
+          </button>
+          <button onclick="sendOutboundQuotationByEmail()" 
+                  class="bg-emerald-600 hover:bg-emerald-700 text-white py-5 rounded-3xl font-bold text-lg transition-all flex items-center justify-center gap-2">
+            <i class="fas fa-paper-plane"></i> Save & Send via Email
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Product Modal -->
+  <div id="addProductModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-8 max-h-[90vh] overflow-hidden flex flex-col">
+      <h3 class="text-xl font-bold mb-4">Add Item from Inventory</h3>
+      <input id="searchProducts" type="text" placeholder="Search products..."
+             class="w-full border border-gray-300 rounded-2xl px-4 py-3 mb-4 focus:border-emerald-500 outline-none" onkeyup="filterProducts()">
+      <div id="productList" class="flex-1 overflow-auto pr-2"></div>
+      <button onclick="hideAddProductModal()" class="mt-6 w-full py-4 border border-gray-300 rounded-2xl font-medium">Close</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDO0N82vMalBzbNtNI0qHH-7paw6UQT9zM",
+      authDomain: "invoiding-database.firebaseapp.com",
+      databaseURL: "https://invoiding-database-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "invoiding-database",
+      storageBucket: "invoiding-database.firebasestorage.app",
+      messagingSenderId: "652678242016",
+      appId: "1:652678242016:web:eec953d046ae53e7f53a85"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const firestore = getFirestore(app);
+
+    let activeCompany = { id: 1, name: "Kerabeaute" };
+    let currentSelectedRfqId = null;
+    let outboundItems = [];
+    let allProducts = [];
+
+    function getCompanyAbbr(name) {
+      if (!name) return "XX";
+      const trimmed = name.trim();
+      const words = trimmed.split(/\s+/);
+      
+      if (words.length >= 2) {
+        return words.map(w => w[0]).join('').toUpperCase().slice(0, 2);
+      } else {
+        const n = trimmed;
+        if (n.length <= 2) return n.toUpperCase();
+        const middleIndex = Math.floor(n.length / 2);
+        return (n[0] + n[middleIndex]).toUpperCase();
+      }
+    }
+
+    async function syncContextWorkspaceRegistry() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) activeCompany = JSON.parse(saved);
+      document.querySelector('h1').textContent = `${activeCompany.name} - RFQ Pipeline`;
+      await generateNextQuoteRef();
+    }
+
+    async function generateNextQuoteRef() {
+      const abbr = getCompanyAbbr(activeCompany.name);
+      const year = new Date().getFullYear();
+      
+      const quotesRef = ref(db, `approved_vendor_quotes/${activeCompany.id}`);
+      
+      return new Promise((resolve) => {
+        onValue(quotesRef, (snapshot) => {
+          let maxNum = 0;
+          
+          if (snapshot.exists()) {
+            const data = snapshot.val();
+            Object.values(data).forEach(quote => {
+              if (quote.ref) {
+                const match = quote.ref.match(/-(\d+)$/);
+                if (match) {
+                  const num = parseInt(match[1]);
+                  if (num > maxNum) maxNum = num;
+                }
+              }
+            });
+          }
+          
+          const nextNum = maxNum + 1;
+          const newRef = `${abbr}-${year}-${nextNum.toString().padStart(3, '0')}`;
+          document.getElementById('quoteRef').value = newRef;
+          resolve();
+        }, { onlyOnce: true });
+      });
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(tab === 0 ? 'inboundTab' : 'outboundTab').classList.remove('hidden');
+     
+      document.querySelectorAll('.tab-button').forEach((btn, i) => {
+        btn.classList.toggle('border-b-4', i === tab);
+        btn.classList.toggle('border-emerald-600', i === tab);
+        btn.classList.toggle('text-emerald-700', i === tab);
+        btn.classList.toggle('text-gray-500', i !== tab);
+      });
+    }
+
+    // ==================== INBOUND LOGIC ====================
+    function initPageContext() {
+      const rfqKey = 'pending_rfqs_' + activeCompany.id;
+      let pending = localStorage.getItem(rfqKey);
+      if (!pending) {
+        localStorage.setItem(rfqKey, JSON.stringify([]));
+        pending = '[]';
+      }
+      renderRfqTable(JSON.parse(pending));
+    }
+
+    function renderRfqTable(rfqs) {
+      const tbody = document.getElementById('rfqTableBody');
+      if (!tbody) return;
+     
+      if (rfqs.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="py-20 text-center text-gray-400">
+              <i class="fas fa-inbox text-5xl mb-4 block"></i>
+              <p class="font-medium">Waiting for quotations</p>
+              <p class="text-sm mt-1">Upload Excel/CSV or receive from vendors</p>
+            </td>
+          </tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      rfqs.forEach(rfq => {
+        const summary = rfq.items.map(i => `${i.qty}x ${i.desc}`).join(', ');
+        const row = document.createElement('tr');
+        row.className = `hover:bg-gray-50 cursor-pointer transition-all ${currentSelectedRfqId === rfq.id ? 'bg-emerald-50' : ''}`;
+        row.onclick = () => window.openReviewSheet(rfq.id);
+        row.innerHTML = `
+          <td class="py-5 px-6 font-medium">${rfq.id}</td>
+          <td class="py-5 px-6">${rfq.vendorName}</td>
+          <td class="py-5 px-6 text-sm text-gray-500 max-w-xs truncate">${summary}</td>
+          <td class="py-5 px-6 text-center flex justify-center gap-4">
+            <button onclick="event.stopImmediatePropagation(); window.openReviewSheet('${rfq.id}')" 
+                    class="text-emerald-600 hover:text-emerald-700 font-medium">Review</button>
+            <button onclick="event.stopImmediatePropagation(); deletePendingRFQ('${rfq.id}')" 
+                    class="text-red-500 hover:text-red-600">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    window.deletePendingRFQ = function(rfqId) {
+      if (!confirm("Delete this pending quotation?")) return;
+      const rfqKey = 'pending_rfqs_' + activeCompany.id;
+      let rfqs = JSON.parse(localStorage.getItem(rfqKey) || '[]');
+      rfqs = rfqs.filter(r => r.id !== rfqId);
+      localStorage.setItem(rfqKey, JSON.stringify(rfqs));
+      renderRfqTable(rfqs);
+    };
+
+    window.deleteAllPendingRFQs = function() {
+      if (!confirm("Delete ALL pending quotations?")) return;
+      const rfqKey = 'pending_rfqs_' + activeCompany.id;
+      localStorage.setItem(rfqKey, JSON.stringify([]));
+      initPageContext();
+    };
+
+    window.openReviewSheet = function(rfqId) {
+      currentSelectedRfqId = rfqId;
+      const rfqKey = 'pending_rfqs_' + activeCompany.id;
+      const rfqs = JSON.parse(localStorage.getItem(rfqKey) || '[]');
+      const rfq = rfqs.find(r => r.id === rfqId);
+      if (!rfq) return;
+      renderRfqTable(rfqs);
+      document.getElementById('reviewSheetPlaceholder').classList.add('hidden');
+      document.getElementById('reviewSheetWorkspace').classList.remove('hidden');
+      document.getElementById('reviewTrackingToken').textContent = rfq.id;
+      document.getElementById('reviewSupplierName').textContent = rfq.vendorName;
+      const itemsTbody = document.getElementById('reviewItemsTableBody');
+      itemsTbody.innerHTML = '';
+      let runningSum = 0;
+      rfq.items.forEach(item => {
+        const cost = item.qty * item.rate;
+        runningSum += cost;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="py-3 px-4 font-medium">${item.desc}</td>
+          <td class="py-3 px-4 text-center">${item.qty}</td>
+          <td class="py-3 px-4 text-right">₹${item.rate}</td>
+          <td class="py-3 px-4 text-right font-semibold">₹${cost.toFixed(2)}</td>
+        `;
+        itemsTbody.appendChild(row);
+      });
+      document.getElementById('reviewGrandTotal').textContent = '₹' + runningSum.toFixed(2);
+    };
+
+    window.closeReviewSheet = function() {
+      currentSelectedRfqId = null;
+      document.getElementById('reviewSheetWorkspace').classList.add('hidden');
+      document.getElementById('reviewSheetPlaceholder').classList.remove('hidden');
+      const rfqKey = 'pending_rfqs_' + activeCompany.id;
+      renderRfqTable(JSON.parse(localStorage.getItem(rfqKey) || '[]'));
+    };
+
+    window.approveAndCommitSelectedQuote = function() {
+      if (!currentSelectedRfqId) return;
+      const rfqKey = 'pending_rfqs_' + activeCompany.id;
+      let rfqs = JSON.parse(localStorage.getItem(rfqKey) || '[]');
+      const rfq = rfqs.find(r => r.id === currentSelectedRfqId);
+      if (!rfq) return;
+      let grandTotalSum = rfq.items.reduce((sum, item) => sum + (item.qty * item.rate), 0);
+      const dbRefPath = 'approved_vendor_quotes/' + activeCompany.id;
+      push(ref(db, dbRefPath), {
+        ref: rfq.id,
+        counterparty: rfq.vendorName,
+        value: '₹' + grandTotalSum.toFixed(2),
+        timestamp: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        itemsCount: rfq.items.length,
+        type: "inbound"
+      }).then(() => {
+        rfqs = rfqs.filter(r => r.id !== currentSelectedRfqId);
+        localStorage.setItem(rfqKey, JSON.stringify(rfqs));
+        alert(`✅ Quotation approved and saved to ledger!`);
+        currentSelectedRfqId = null;
+        document.getElementById('reviewSheetWorkspace').classList.add('hidden');
+        document.getElementById('reviewSheetPlaceholder').classList.remove('hidden');
+        renderRfqTable(rfqs);
+      }).catch((error) => {
+        console.error("Error writing to Firebase:", error);
+        alert("Failed to sync to cloud database.");
+      });
+    };
+
+    window.handleQuoteUpload = function(event) {
+      const files = event.target.files;
+      if (!files.length) return;
+
+      let processed = 0;
+      let added = 0;
+
+      Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            let workbook;
+            if (file.name.toLowerCase().endsWith('.csv')) {
+              workbook = XLSX.read(e.target.result, { type: 'string' });
+            } else {
+              workbook = XLSX.read(e.target.result, { type: 'array' });
+            }
+
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(sheet);
+
+            jsonData.forEach(row => {
+              const supplier = row.Supplier || row.Vendor || row.Company || row['Supplier Name'] || "Unknown Supplier";
+              const ref = row['RFQ ID'] || row.Reference || row.ID || `UPLOAD-${Date.now()}`;
+
+              const items = [];
+              if (row.Item || row.Product || row.Description) {
+                items.push({
+                  desc: row.Item || row.Product || row.Description || "Unnamed Item",
+                  qty: parseInt(row.Qty || row.Quantity || row.QTY || 1),
+                  rate: parseFloat(row.Rate || row.Price || row['Unit Price'] || 0)
+                });
+              }
+
+              if (items.length > 0) {
+                const rfqKey = 'pending_rfqs_' + activeCompany.id;
+                let pending = JSON.parse(localStorage.getItem(rfqKey) || '[]');
+                pending.unshift({
+                  id: ref,
+                  vendorName: supplier,
+                  items: items
+                });
+                localStorage.setItem(rfqKey, JSON.stringify(pending));
+                added++;
+              }
+            });
+
+            processed++;
+            if (processed === files.length) {
+              alert(`✅ Successfully imported ${added} quotation(s) from ${files.length} file(s)!`);
+              initPageContext();
+              document.getElementById('quoteUpload').value = '';
+            }
+          } catch (err) {
+            console.error(err);
+            alert("Failed to process file: " + file.name);
+          }
+        };
+
+        if (file.name.toLowerCase().endsWith('.csv')) {
+          reader.readAsText(file);
+        } else {
+          reader.readAsArrayBuffer(file);
+        }
+      });
+    };
+
+    // ==================== OUTBOUND LOGIC ====================
+    async function loadProductsForOutbound() {
+      allProducts = [];
+      try {
+        const q = query(collection(firestore, "products"), where("brandId", "==", activeCompany.id));
+        const snapshot = await getDocs(q);
+        snapshot.forEach(doc => allProducts.push({ id: doc.id, ...doc.data() }));
+      } catch (e) {
+        console.error("Error loading products:", e);
+      }
+    }
+
+    function showAddProductModal() {
+      loadProductsForOutbound().then(() => renderProductList());
+      document.getElementById('addProductModal').classList.remove('hidden');
+      document.getElementById('addProductModal').classList.add('flex');
+    }
+
+    function hideAddProductModal() {
+      document.getElementById('addProductModal').classList.add('hidden');
+      document.getElementById('addProductModal').classList.remove('flex');
+    }
+
+    function renderProductList(filtered = allProducts) {
+      const container = document.getElementById('productList');
+      container.innerHTML = '';
+      if (filtered.length === 0) {
+        container.innerHTML = `<p class="text-center text-gray-400 py-8">No products found</p>`;
+        return;
+      }
+      filtered.forEach((p, index) => {
+        const div = document.createElement('div');
+        div.className = "flex justify-between items-center p-4 hover:bg-gray-50 rounded-2xl cursor-pointer border-b last:border-none";
+        div.innerHTML = `
+          <div>
+            <div class="font-medium">${p.name}</div>
+            <div class="text-sm text-gray-500">₹${Number(p.price).toFixed(2)}</div>
+          </div>
+          <button onclick="addToOutbound(${index}); event.stopImmediatePropagation()" 
+                  class="bg-emerald-600 text-white px-5 py-2 rounded-2xl text-sm font-medium">Add</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    window.filterProducts = function() {
+      const term = document.getElementById('searchProducts').value.toLowerCase().trim();
+      const filtered = allProducts.filter(p => p.name.toLowerCase().includes(term));
+      renderProductList(filtered);
+    };
+
+    window.addToOutbound = function(index) {
+      const product = allProducts[index];
+      const existing = outboundItems.find(item => item.name === product.name);
+      if (existing) existing.qty += 1;
+      else {
+        outboundItems.push({
+          name: product.name,
+          price: parseFloat(product.price) || 0,
+          qty: 1
+        });
+      }
+      renderOutboundItems();
+    };
+
+    function renderOutboundItems() {
+      const tbody = document.getElementById('outboundItemsBody');
+      tbody.innerHTML = '';
+      let total = 0;
+      outboundItems.forEach((item, i) => {
+        const amount = item.qty * item.price;
+        total += amount;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="py-4 px-4 font-medium">${item.name}</td>
+          <td class="py-4 px-4 text-center">
+            <input type="number" value="${item.qty}" min="1"
+                   onchange="updateOutboundQty(${i}, this.value)"
+                   class="w-16 border border-gray-300 rounded-lg text-center focus:border-emerald-500">
+          </td>
+          <td class="py-4 px-4 text-right">₹${item.price.toFixed(2)}</td>
+          <td class="py-4 px-4 text-right font-semibold">₹${amount.toFixed(2)}</td>
+          <td class="py-4 px-4 text-center">
+            <button onclick="removeOutboundItem(${i})" class="text-red-500 hover:text-red-600">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+      document.getElementById('outboundTotal').textContent = '₹' + total.toFixed(2);
+    }
+
+    window.updateOutboundQty = function(i, newQty) {
+      outboundItems[i].qty = Math.max(1, parseInt(newQty) || 1);
+      renderOutboundItems();
+    };
+
+    window.removeOutboundItem = function(i) {
+      outboundItems.splice(i, 1);
+      renderOutboundItems();
+    };
+
+    async function saveToFirebase(quoteRef, clientName, items, status = "Generated") {
+      const quotesRef = ref(db, `approved_vendor_quotes/${activeCompany.id}`);
+      await push(quotesRef, {
+        ref: quoteRef,
+        client: clientName,
+        type: "outbound",
+        items: items,
+        itemsCount: items.length,
+        total: items.reduce((sum, i) => sum + (i.qty * i.price), 0),
+        value: '₹' + items.reduce((sum, i) => sum + (i.qty * i.price), 0).toFixed(2),
+        timestamp: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        status: status
+      });
+    }
+
+    window.saveOutboundQuotation = async function() {
+      if (outboundItems.length === 0) return alert("Please add at least one product.");
+      const clientName = document.getElementById('clientName').value.trim() || "Walk-in Client";
+      const quoteRef = document.getElementById('quoteRef').value;
+
+      try {
+        await saveToFirebase(quoteRef, clientName, outboundItems, "Generated");
+        alert(`✅ Quotation ${quoteRef} saved successfully!`);
+        outboundItems = [];
+        renderOutboundItems();
+        document.getElementById('clientName').value = '';
+        await generateNextQuoteRef();
+      } catch (error) {
+        console.error(error);
+        alert("Failed to save quotation.");
+      }
+    };
+
+    window.sendOutboundQuotationByEmail = async function() {
+      if (outboundItems.length === 0) return alert("Please add at least one product.");
+
+      const clientName = document.getElementById('clientName').value.trim() || "Walk-in Client";
+      const clientEmail = document.getElementById('clientEmail').value.trim();
+      const quoteRef = document.getElementById('quoteRef').value;
+
+      if (!clientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
+        return alert("Please enter a valid client email address.");
+      }
+
+      const total = outboundItems.reduce((sum, i) => sum + (i.qty * i.price), 0);
+
+      const dynamicData = {
+        type: "Quotation",
+        number: quoteRef,
+        companyName: activeCompany.name,
+        logoUrl: "", 
+        items: outboundItems.map(item => ({
+          name: item.name,
+          qty: item.qty,
+          price: item.price
+        })),
+        subtotal: total,
+        taxAmount: 0,
+        total: total
+      };
+
+      try {
+        const response = await fetch('/api/send-document', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            toEmail: clientEmail,
+            dynamicData: dynamicData
+          })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          alert(`✅ Quotation ${quoteRef} sent successfully to ${clientEmail}!`);
+          
+          await saveToFirebase(quoteRef, clientName, outboundItems, "Sent");
+          
+          outboundItems = [];
+          renderOutboundItems();
+          document.getElementById('clientName').value = '';
+          document.getElementById('clientEmail').value = '';
+          await generateNextQuoteRef();
+        } else {
+          alert("Failed to send email: " + (result.error?.message || result.error));
+        }
+      } catch (error) {
+        console.error(error);
+        alert("Error sending email. Make sure your backend is deployed and running on Render.");
+      }
+    };
+
+    // Make functions global
+    window.switchTab = switchTab;
+    window.showAddProductModal = showAddProductModal;
+    window.hideAddProductModal = hideAddProductModal;
+    window.filterProducts = window.filterProducts;
+    window.addToOutbound = window.addToOutbound;
+    window.updateOutboundQty = window.updateOutboundQty;
+    window.removeOutboundItem = window.removeOutboundItem;
+    window.saveOutboundQuotation = window.saveOutboundQuotation;
+    window.sendOutboundQuotationByEmail = window.sendOutboundQuotationByEmail;
+    window.handleQuoteUpload = window.handleQuoteUpload;
+    window.deletePendingRFQ = window.deletePendingRFQ;
+    window.deleteAllPendingRFQs = window.deleteAllPendingRFQs;
+    window.openReviewSheet = window.openReviewSheet;
+    window.closeReviewSheet = window.closeReviewSheet;
+    window.approveAndCommitSelectedQuote = window.approveAndCommitSelectedQuote;
+
+    window.onload = function() {
+      syncContextWorkspaceRegistry().then(() => {
+        initPageContext();
+        switchTab(0);
+      });
+    };
+  </script>
+</body>
+</html>

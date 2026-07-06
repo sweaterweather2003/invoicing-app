@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recurring Billing Matrices</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 p-8 font-sans">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-8 border-b pb-4">
+      <div>
+        <div class="text-xs text-gray-400 font-bold uppercase tracking-widest"><i class="fas fa-redo"></i> Financial Accounts Matrix</div>
+        <h1 class="text-4xl font-black text-gray-900">Recurring Invoices - <span id="companyTitle" class="text-blue-600"></span></h1>
+      </div>
+      <div class="flex gap-3">
+        <label class="bg-black text-white px-5 py-3 rounded-xl cursor-pointer flex items-center gap-2 font-bold text-sm shadow-sm hover:opacity-90 transition-all">
+          <i class="fas fa-upload"></i> Import Schedule Sheet
+          <input type="file" id="fileUpload" accept=".csv,.xlsx" class="hidden" onchange="handleFileUpload(event)">
+        </label>
+        <button onclick="deleteAllRecurring()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-3 rounded-xl text-sm shadow-sm transition-all">
+          <i class="fas fa-ban"></i> Terminate All Schedules
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b bg-gray-50">
+        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Query client recurring profiles..." class="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none text-sm focus:border-black font-medium">
+      </div>
+      <table class="w-full text-left">
+        <thead class="bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider border-b">
+          <tr>
+            <th class="p-4">Client Target Entity Account</th>
+            <th class="p-4 text-right">Commitment Valuation Amount (₹)</th>
+            <th class="p-4 text-center">Interval Cycle Frequency</th>
+            <th class="p-4 text-center">Next Scheduled Fire Trigger Date</th>
+            <th class="p-4 text-center">Loop Operational Status</th>
+            <th class="p-4 w-20 text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody" class="divide-y text-sm font-medium text-gray-700">
+          </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let recurringData = [];
+    let currentCompany = { id: "1", name: "Kerabeaute" };
+
+    function loadCurrentCompany() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) {
+        currentCompany = JSON.parse(saved);
+      }
+      document.getElementById('companyTitle').textContent = currentCompany.name;
+      loadRecurringSchedules();
+    }
+
+    function loadRecurringSchedules() {
+      const key = 'recurring_' + currentCompany.id;
+      recurringData = JSON.parse(localStorage.getItem(key) || '[]');
+      
+      if (recurringData.length === 0) {
+        recurringData = [
+          { client: "Venkatesh Distributing Brands Ltd", amount: 185000, frequency: "Monthly Retainer", nextDate: "2026-06-01", status: "Active" },
+          { client: "Tanttu Online Retail Store Node", amount: 45000, frequency: "Quarterly Audit Fee", nextDate: "2026-07-15", status: "Active" }
+        ];
+        localStorage.setItem(key, JSON.stringify(recurringData));
+      }
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      recurringData.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50/50 border-b border-gray-100 transition-all";
+        row.innerHTML = `
+          <td class="p-4 font-bold text-gray-900">${item.client}</td>
+          <td class="p-4 text-right font-mono font-bold text-gray-900">₹${Number(item.amount).toLocaleString('en-IN')}</td>
+          <td class="p-4 text-center text-xs font-semibold text-purple-600">${item.frequency}</td>
+          <td class="p-4 text-center font-mono text-xs text-gray-500">${item.nextDate || '-'}</td>
+          <td class="p-4 text-center"><span class="bg-green-100 text-green-700 font-bold px-3 py-1 rounded-full text-xs uppercase tracking-wide border border-green-200">${item.status}</span></td>
+          <td class="p-4 text-center">
+            <button onclick="deleteItem(${index})" class="w-7 h-7 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center mx-auto transition-all">✕</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function deleteItem(index) {
+      if (confirm("Confirm cancellation and removal of this recurring ledger automation pattern schedule?")) {
+        recurringData.splice(index, 1);
+        saveDataStream();
+        renderTable();
+      }
+    }
+
+    function deleteAllRecurring() {
+      if (confirm("CRITICAL CHANGE DIRECTION: Deactivate ALL automated subscription schedules for this brand?")) {
+        recurringData = [];
+        saveDataStream();
+        renderTable();
+      }
+    }
+
+    function saveDataStream() {
+      const key = 'recurring_' + currentCompany.id;
+      localStorage.setItem(key, JSON.stringify(recurringData));
+    }
+
+    function filterTable() {
+      const term = document.getElementById('searchInput').value.toLowerCase().trim();
+      const rows = document.querySelectorAll('#tableBody tr');
+      rows.forEach((row, idx) => {
+        const matchText = (recurringData[idx]?.client || '').toLowerCase();
+        if (matchText.includes(term)) row.classList.remove('hidden');
+        else row.classList.add('hidden');
+      });
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const workbook = XLSX.read(e.target.result, { type: 'array' });
+          const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+          
+          const parsed = json.map(r => ({
+            client: r["Client Entity Name"] || r["Client"] || r["client"] || "Unnamed Contract Entity",
+            amount: parseFloat(r["Billing Valuation"]) || parseFloat(r["amount"]) || 0,
+            frequency: r["Cycle Type"] || r["frequency"] || "Monthly Matrix",
+            nextDate: r["Trigger Date"] || r["nextDate"] || "2026-06-01",
+            status: "Active"
+          }));
+
+          recurringData = [...recurringData, ...parsed];
+          saveDataStream();
+          renderTable();
+          alert(`✅ Injected ${parsed.length} subscription profiles into background checking microservice arrays.`);
+        } catch (err) {
+          alert("Error parsing file format layer maps: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    window.onload = loadCurrentCompany;
+  </script>
+</body>
+</html>

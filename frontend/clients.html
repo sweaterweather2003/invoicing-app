@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clients</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 p-8">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-8">
+      <h1 class="text-4xl font-bold">Clients - <span id="companyTitle" class="text-blue-600"></span></h1>
+      <div class="flex gap-4">
+        <label class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl cursor-pointer flex items-center gap-2">
+          <i class="fas fa-upload"></i> Upload CSV or Excel
+          <input type="file" id="fileUpload" accept=".csv,.xlsx" class="hidden" onchange="handleFileUpload(event)">
+        </label>
+        <button onclick="deleteAllClients()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2">
+          <i class="fas fa-trash"></i> Delete All
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow overflow-hidden">
+      <div class="p-4 border-b">
+        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Search clients..." class="w-full p-4 border rounded-2xl">
+      </div>
+      <table class="w-full">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="p-4 text-left">Client Name</th>
+            <th class="p-4 text-left">Email</th>
+            <th class="p-4 text-left">Phone</th>
+            <th class="p-4 text-left">Group</th>
+            <th class="p-4 w-20 text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody" class="divide-y"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, writeBatch, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDO0N82vMalBzbNtNI0qHH-7paw6UQT9zM",
+      authDomain: "invoiding-database.firebaseapp.com",
+      projectId: "invoiding-database",
+      storageBucket: "invoiding-database.firebasestorage.app",
+      messagingSenderId: "652678242016",
+      appId: "1:652678242016:web:eec953d046ae53e7f53a85"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let clientsData = [];
+    let currentCompany = null;
+
+    function loadCurrentCompany() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) {
+        currentCompany = JSON.parse(saved);
+        document.getElementById('companyTitle').textContent = currentCompany.name;
+      } else {
+        currentCompany = { id: "1", name: "Kerabeaute" };
+        document.getElementById('companyTitle').textContent = "Kerabeaute";
+      }
+    }
+
+    async function loadClients() {
+      clientsData = [];
+      if (!currentCompany) return;
+      try {
+        const q = query(
+          collection(db, "clients"),
+          where("brandId", "==", currentCompany.id)
+        );
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((document) => {
+          clientsData.push({ id: document.id, ...document.data() });
+        });
+        renderTable();
+      } catch (error) {
+        console.error("Error loading clients:", error);
+        alert("Could not connect to cloud clients database.");
+      }
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        try {
+          let newClients = [];
+          if (file.name.endsWith('.csv')) {
+            newClients = parseCSVData(e.target.result);
+          } else {
+            const workbook = XLSX.read(e.target.result, { type: 'array' });
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+            newClients = parseExcelData(jsonData);
+          }
+          if (newClients.length > 0) {
+            await saveClientsToFirestore(newClients);
+            await loadClients();
+            alert(`✅ Added ${newClients.length} clients to cloud!`);
+          }
+        } catch (err) {
+          alert("Error reading file: " + err.message);
+        }
+      };
+
+      if (file.name.endsWith('.csv')) {
+        reader.readAsText(file);
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    function parseCSVData(csv) {
+      const rows = csv.trim().split('\n');
+      const newClients = [];
+
+      for (let i = 1; i < rows.length; i++) {
+        if (!rows[i].trim()) continue;
+        const cols = rows[i].split(',').map(c => c.trim().replace(/"/g, ''));
+        if (cols.length >= 1 && cols[0]) {
+          newClients.push({
+            name: cols[0],
+            email: cols[1] || "",
+            phone: cols[2] || "",
+            group: cols[3] || "General"
+          });
+        }
+      }
+      return newClients;
+    }
+
+    function parseExcelData(jsonData) {
+      return jsonData.map(row => ({
+        name: row.Name || row.name || "",
+        email: row.Email || row.email || "",
+        phone: row.Phone || row.phone || "",
+        group: row.Group || row.group || "General"
+      })).filter(c => c.name);
+    }
+
+    async function saveClientsToFirestore(newClients) {
+      if (!currentCompany) return;
+      try {
+        const batch = writeBatch(db);
+        newClients.forEach(client => {
+          const clientRef = doc(collection(db, "clients"));
+          batch.set(clientRef, {
+            brandId: currentCompany.id,
+            name: client.name,
+            email: client.email || "",
+            phone: client.phone || "",
+            group: client.group || "General",
+            timestamp: serverTimestamp()
+          });
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error(err);
+        alert("Failed to save clients to cloud.");
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      if (clientsData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-12 text-center text-gray-500">No clients for this company yet. Upload a file.</td></tr>`;
+        return;
+      }
+
+      clientsData.forEach((client) => {
+        const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50";
+        row.innerHTML = `
+          <td class="p-4 font-medium">${client.name}</td>
+          <td class="p-4">${client.email}</td>
+          <td class="p-4">${client.phone}</td>
+          <td class="p-4">${client.group}</td>
+          <td class="p-4 text-center">
+            <button onclick="deleteClient('${client.id}')" class="text-red-500 hover:text-red-700 text-xl">✕</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    async function deleteClient(docId) {
+      if (confirm("Delete this client?")) {
+        try {
+          await deleteDoc(doc(db, "clients", docId));
+          await loadClients();
+        } catch (err) {
+          console.error(err);
+          alert("Failed to delete client.");
+        }
+      }
+    }
+
+    async function deleteAllClients() {
+      if (confirm("Delete ALL clients for this company?")) {
+        try {
+          const q = query(collection(db, "clients"), where("brandId", "==", currentCompany.id));
+          const snapshot = await getDocs(q);
+          const batch = writeBatch(db);
+          snapshot.forEach((d) => batch.delete(d.ref));
+          await batch.commit();
+          await loadClients();
+        } catch (err) {
+          console.error(err);
+          alert("Failed to purge all clients.");
+        }
+      }
+    }
+
+    function filterTable() {
+      const term = document.getElementById('searchInput').value.toLowerCase().trim();
+      const filtered = clientsData.filter(c => c.name.toLowerCase().includes(term));
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-12 text-center text-gray-500">No matching clients found.</td></tr>`;
+        return;
+      }
+
+      filtered.forEach((client) => {
+        const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50";
+        row.innerHTML = `
+          <td class="p-4 font-medium">${client.name}</td>
+          <td class="p-4">${client.email}</td>
+          <td class="p-4">${client.phone}</td>
+          <td class="p-4">${client.group}</td>
+          <td class="p-4 text-center">
+            <button onclick="deleteClient('${client.id}')" class="text-red-500 hover:text-red-700 text-xl">✕</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // Make functions globally available
+    window.handleFileUpload = handleFileUpload;
+    window.deleteClient = deleteClient;
+    window.deleteAllClients = deleteAllClients;
+    window.filterTable = filterTable;
+
+    window.onload = async () => {
+      loadCurrentCompany();
+      await loadClients();
+    };
+  </script>
+</body>
+</html>

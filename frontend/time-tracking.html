@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Time Tracking</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 p-8">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-8">
+      <h1 class="text-4xl font-bold">Time Tracking - <span id="companyTitle" class="text-blue-600"></span></h1>
+      <div class="flex gap-4">
+        <label class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl cursor-pointer flex items-center gap-2">
+          <i class="fas fa-upload"></i> Upload CSV or Excel
+          <input type="file" id="fileUpload" accept=".csv,.xlsx" class="hidden" onchange="handleFileUpload(event)">
+        </label>
+        <button onclick="deleteAllEntries()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2">
+          <i class="fas fa-trash"></i> Delete All
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-12 gap-8">
+      <!-- Live Timer -->
+      <div class="col-span-12 lg:col-span-5 bg-white rounded-3xl shadow p-8">
+        <h2 class="text-2xl font-semibold mb-6">Live Timer</h2>
+        <div id="timerDisplay" class="text-7xl font-mono font-bold text-center mb-8 text-gray-800">00:00:00</div>
+        
+        <div class="flex gap-4 justify-center">
+          <button onclick="startTimer()" class="bg-green-600 hover:bg-green-700 text-white px-8 py-4 rounded-2xl flex items-center gap-2">
+            <i class="fas fa-play"></i> Start
+          </button>
+          <button onclick="pauseTimer()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-8 py-4 rounded-2xl flex items-center gap-2">
+            <i class="fas fa-pause"></i> Pause
+          </button>
+          <button onclick="stopTimer()" class="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl flex items-center gap-2">
+            <i class="fas fa-stop"></i> Stop & Save
+          </button>
+        </div>
+
+        <div class="mt-8">
+          <label class="block text-sm font-medium mb-2">Description</label>
+          <input id="timeDescription" type="text" placeholder="Working on client project..." 
+                 class="w-full p-4 border rounded-2xl focus:outline-none focus:border-blue-500">
+        </div>
+      </div>
+
+      <!-- Time Entries -->
+      <div class="col-span-12 lg:col-span-7">
+        <h2 class="text-2xl font-semibold mb-6">Recent Time Entries</h2>
+        <div class="bg-white rounded-3xl shadow overflow-hidden">
+          <table class="w-full">
+            <thead class="bg-gray-100">
+              <tr>
+                <th class="p-4 text-left">Date</th>
+                <th class="p-4 text-left">Description</th>
+                <th class="p-4 text-center">Hours</th>
+                <th class="p-4 text-right">Amount (₹)</th>
+                <th class="p-4 w-20 text-center">Action</th>
+              </tr>
+            </thead>
+            <tbody id="timeEntries" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let timerInterval;
+    let seconds = 0;
+    let isRunning = false;
+    let timeEntries = [];
+    let currentCompany = null;
+
+    function loadCurrentCompany() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) {
+        currentCompany = JSON.parse(saved);
+        document.getElementById('companyTitle').textContent = currentCompany.name;
+      } else {
+        currentCompany = { id: "1", name: "Kerabeaute" };
+        document.getElementById('companyTitle').textContent = "Kerabeaute";
+      }
+    }
+
+    function loadTimeEntries() {
+      if (!currentCompany) return;
+      const key = 'timeentries_' + currentCompany.id;
+      timeEntries = JSON.parse(localStorage.getItem(key) || '[]');
+      renderTimeEntries();
+    }
+
+    function saveTimeEntries() {
+      if (currentCompany) {
+        const key = 'timeentries_' + currentCompany.id;
+        localStorage.setItem(key, JSON.stringify(timeEntries));
+      }
+    }
+
+    // Excel Date Fix
+    function excelDateToJSDate(serial) {
+      if (typeof serial !== "number") return serial || "";
+      const utc_days = Math.floor(serial - 25569);
+      const date = new Date(utc_days * 86400 * 1000);
+      return date.toISOString().split('T')[0];
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          if (file.name.endsWith('.csv')) {
+            parseCSV(e.target.result);
+          } else {
+            const workbook = XLSX.read(e.target.result, { type: 'array' });
+            const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { raw: false });
+            parseExcelData(jsonData);
+          }
+        } catch (err) {
+          alert("Error reading file: " + err.message);
+        }
+      };
+
+      if (file.name.endsWith('.csv')) reader.readAsText(file);
+      else reader.readAsArrayBuffer(file);
+    }
+
+    function parseExcelData(jsonData) {
+      const newEntries = jsonData.map(row => {
+        let dateStr = row.Date || row.date || "";
+
+        if (typeof dateStr === 'number') {
+          dateStr = excelDateToJSDate(dateStr);
+        }
+
+        return {
+          date: dateStr || new Date().toLocaleDateString('en-IN'),
+          description: row.Description || row.description || "Imported Entry",
+          hours: parseFloat(row.Hours || row.hours) || 0,
+          amount: parseFloat(row.Amount || row.amount) || 0
+        };
+      }).filter(item => item.description && item.hours > 0);
+
+      timeEntries = [...newEntries, ...timeEntries];
+      saveTimeEntries();
+      renderTimeEntries();
+      alert(`✅ Added ${newEntries.length} time entries!`);
+    }
+
+    function parseCSV(csv) {
+      alert("Please use Excel (.xlsx) file for best date formatting.");
+    }
+
+    function updateTimerDisplay() {
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      document.getElementById('timerDisplay').textContent = 
+        `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function startTimer() {
+      if (!isRunning) {
+        isRunning = true;
+        timerInterval = setInterval(() => {
+          seconds++;
+          updateTimerDisplay();
+        }, 1000);
+      }
+    }
+
+    function pauseTimer() {
+      clearInterval(timerInterval);
+      isRunning = false;
+    }
+
+    function stopTimer() {
+      pauseTimer();
+      const description = document.getElementById('timeDescription').value.trim() || "Untitled Task";
+      const hours = (seconds / 3600).toFixed(2);
+      const amount = (hours * 1500).toFixed(0);
+
+      const entry = {
+        date: new Date().toLocaleDateString('en-IN'),
+        description: description,
+        hours: parseFloat(hours),
+        amount: parseFloat(amount)
+      };
+
+      timeEntries.unshift(entry);
+      saveTimeEntries();
+      renderTimeEntries();
+
+      seconds = 0;
+      updateTimerDisplay();
+      document.getElementById('timeDescription').value = '';
+      alert("✅ Time entry saved!");
+    }
+
+    function renderTimeEntries() {
+      const tbody = document.getElementById('timeEntries');
+      tbody.innerHTML = '';
+
+      if (timeEntries.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-12 text-center text-gray-500">No time entries yet. Start timer or upload file.</td></tr>`;
+        return;
+      }
+
+      timeEntries.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50";
+        row.innerHTML = `
+          <td class="p-4">${entry.date}</td>
+          <td class="p-4">${entry.description}</td>
+          <td class="p-4 text-center">${entry.hours} hrs</td>
+          <td class="p-4 text-right font-medium">₹${entry.amount}</td>
+          <td class="p-4 text-center">
+            <button onclick="deleteEntry(${index})" class="text-red-500 hover:text-red-700 text-xl">✕</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function deleteEntry(index) {
+      if (confirm("Delete this time entry?")) {
+        timeEntries.splice(index, 1);
+        saveTimeEntries();
+        renderTimeEntries();
+      }
+    }
+
+    function deleteAllEntries() {
+      if (confirm("Delete ALL time entries for this company?")) {
+        timeEntries = [];
+        saveTimeEntries();
+        renderTimeEntries();
+      }
+    }
+
+    window.onload = () => {
+      loadCurrentCompany();
+      loadTimeEntries();
+      updateTimerDisplay();
+    };
+  </script>
+</body>
+</html>

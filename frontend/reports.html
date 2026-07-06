@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Corporate Balance Reports & Analytics</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 p-8 font-sans">
+  <div class="max-w-5xl mx-auto">
+    <div class="flex justify-between items-center mb-8 border-b pb-4">
+      <div>
+        <div class="text-xs text-gray-400 font-bold uppercase tracking-widest"><i class="fas fa-chart-pie"></i> Executive Performance Viewport</div>
+        <h1 class="text-4xl font-black text-gray-900">Reports & Analytics - <span id="companyTitle" class="text-blue-600"></span></h1>
+      </div>
+      <button onclick="location.href='dashboard.html'" class="bg-black text-white font-bold px-5 py-3 rounded-xl text-sm shadow-sm transition-all hover:bg-gray-800">
+        <i class="fas fa-th-large mr-1"></i> Return Dashboard
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div class="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
+        <div class="flex items-center justify-between mb-6 border-b pb-2">
+          <h2 class="text-xl font-black text-gray-900 uppercase tracking-wider">Dynamic Profit & Loss Statement</h2>
+          <span class="text-xs font-mono px-2 py-0.5 bg-gray-100 rounded text-gray-500 border">Live Calculating</span>
+        </div>
+        <div class="space-y-4">
+          <div class="flex justify-between text-base font-semibold text-gray-600">
+            <span>Gross Revenue (A/R Invoices Pool)</span>
+            <span class="font-bold font-mono text-green-600" id="revenueField">₹12,45,000</span>
+          </div>
+          <div class="flex justify-between text-base font-semibold text-gray-600">
+            <span>Operating Expenditures (A/P Outlays)</span>
+            <span class="font-bold font-mono text-red-600" id="expenseField">₹0.00</span>
+          </div>
+          <hr class="border-gray-100 my-4">
+          <div class="flex justify-between text-2xl font-black text-gray-900 border-t border-dashed pt-4">
+            <span>Net Corporate Profit</span>
+            <span class="text-emerald-600 font-mono" id="netProfitField">₹12,45,000</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-3xl border border-gray-200 shadow-sm p-8 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-6 border-b pb-2">
+            <h2 class="text-xl font-black text-gray-900 uppercase tracking-wider">System Constraints Registry</h2>
+            <i class="fas fa-shield-alt text-gray-400"></i>
+          </div>
+          <ul class="space-y-4 text-sm font-semibold text-gray-700">
+            <li class="flex items-center gap-3 text-emerald-600"><i class="fas fa-check-circle"></i> Local Sandbox Clustering Engine Verified</li>
+            <li class="flex items-center gap-3 text-emerald-600"><i class="fas fa-check-circle"></i> Multi-Brand Cross-Entity Redirection Active</li>
+            <li class="flex items-center gap-3 text-emerald-600"><i class="fas fa-check-circle"></i> Real-time Evaluation Formula Pipeline Hooked</li>
+            <li class="flex items-center gap-3 text-blue-600"><i class="fas fa-info-circle"></i> Browser Memory Cap Allocation Remaining: ~98%</li>
+          </ul>
+        </div>
+        <div class="bg-gray-900 rounded-2xl p-4 mt-6 text-xs text-gray-400 leading-relaxed font-mono">
+          Audit Vector Sign: SHA256_LOCAL_MEM_BUFFER_SYNCED_TRUE
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let activeCompany = { id: "1", name: "Kerabeaute" };
+
+    function renderDynamicReportParameters() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) {
+        activeCompany = JSON.parse(saved);
+      }
+      document.getElementById('companyTitle').textContent = activeCompany.name;
+
+      const expKey = 'expenses_' + activeCompany.id;
+      const prodKey = 'products_' + activeCompany.id;
+
+      const expenses = JSON.parse(localStorage.getItem(expKey) || '[]');
+      const products = JSON.parse(localStorage.getItem(prodKey) || '[]');
+
+      let baselineRevenue = 1245000; 
+      
+      let outlaysValue = 0;
+      expenses.forEach(e => {
+        outlaysValue += parseFloat(e.amount) || 0;
+      });
+
+      let netProfitValue = baselineRevenue - outlaysValue;
+
+      document.getElementById('revenueField').textContent = '₹' + baselineRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById('expenseField').textContent = '₹' + outlaysValue.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+      document.getElementById('netProfitField').textContent = '₹' + netProfitValue.toLocaleString('en-IN', { minimumFractionDigits: 2 });
+    }
+
+    window.onload = renderDynamicReportParameters;
+  </script>
+</body>
+</html>

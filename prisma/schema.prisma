@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  logo        String?
+  tagline     String?
+  brandColor  String?  @map("color")
+  users       User[]
+  clients     Client[]
+  products    Product[]
+  vendors     Vendor[]
+  expenses    Expense[]
+  recurring   RecurringDocument[]
+  documents   Document[]
+}
+
+model User {
+  id        String  @id @default(cuid())
+  email     String  @unique
+  password  String
+  name      String?
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+}
+
+model Client {
+  id          String               @id @default(cuid())
+  name        String
+  email       String?
+  phone       String?
+  group       String?
+  companyId   String
+  company     Company              @relation(fields: [companyId], references: [id])
+  documents   Document[]
+  recurring   RecurringDocument[]
+}
+
+model Product {
+  id        String  @id @default(cuid())
+  name      String
+  price     Float
+  stock     Int     @default(0)
+  leadTime  String?
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+}
+
+model Vendor {
+  id        String  @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  category  String?
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Float
+  date        DateTime @default(now())
+  vendor      String?
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+}
+
+model RecurringDocument {
+  id          String   @id @default(cuid())
+  clientId    String
+  amount      Float
+  frequency   String
+  nextDate    DateTime
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  client      Client   @relation(fields: [clientId], references: [id])
+}
+
+model Document {
+  id          String     @id @default(cuid())
+  type        String
+  number      String
+  total       Float
+  subtotal    Float?
+  taxRate     Float?
+  taxAmount   Float?
+  status      String     @default("draft")
+  createdAt   DateTime   @default(now())
+  dueDate     DateTime?
+  companyId   String
+  clientId    String
+  company     Company    @relation(fields: [companyId], references: [id])
+  client      Client     @relation(fields: [clientId], references: [id])
+  items       LineItem[]
+}
+
+model LineItem {
+  id         String   @id @default(cuid())
+  name       String
+  qty        Int
+  price      Float
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+}

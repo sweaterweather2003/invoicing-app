@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quotations Ledger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  
+  <!-- jsPDF + AutoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div class="max-w-7xl mx-auto p-8">
+    
+    <div class="flex items-center justify-between mb-8">
+      <div class="flex items-center gap-4">
+        <button onclick="location.href='dashboard.html'" class="w-10 h-10 flex items-center justify-center rounded-2xl bg-white border border-gray-200 hover:bg-gray-100 transition-all">
+          <i class="fas fa-arrow-left text-gray-600"></i>
+        </button>
+        <div>
+          <h1 class="text-4xl font-bold text-gray-900">Quotations Ledger</h1>
+          <p class="text-gray-500">All approved and generated quotations</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-3">
+        <button onclick="deleteAllQuotes()" class="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-semibold transition-all">
+          <i class="fas fa-trash-alt"></i> Delete All
+        </button>
+        <button onclick="location.href='rfq.html'" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl flex items-center gap-2 font-semibold transition-all">
+          <i class="fas fa-plus"></i> New RFQ
+        </button>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="flex border-b mb-8">
+      <button onclick="switchTab(0)" id="tab0" class="tab-button px-8 py-4 font-semibold border-b-4 border-emerald-600 text-emerald-700">Inbound (From Vendors)</button>
+      <button onclick="switchTab(1)" id="tab1" class="tab-button px-8 py-4 font-semibold text-gray-500 hover:text-gray-700">Outbound (To Clients)</button>
+    </div>
+
+    <div class="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+        <h2 id="tabTitle" class="font-semibold text-lg text-gray-800">All Quotations</h2>
+        <div class="flex items-center gap-2 text-sm text-gray-500">
+          <i class="fas fa-wifi text-emerald-500"></i>
+          <span>Live Synced</span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="bg-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">
+              <th class="py-5 px-6 text-left">Reference</th>
+              <th class="py-5 px-6 text-left">Party</th>
+              <th class="py-5 px-6 text-center">Type</th>
+              <th class="py-5 px-6 text-center">Items</th>
+              <th class="py-5 px-6 text-right">Value</th>
+              <th class="py-5 px-6 text-left">Date</th>
+              <th class="py-5 px-6 text-center">Status</th>
+              <th class="py-5 px-6 text-center">Download</th>
+              <th class="py-5 px-6 text-center w-16">Action</th>
+            </tr>
+          </thead>
+          <tbody id="quotesTableBody" class="divide-y text-gray-700"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDO0N82vMalBzbNtNI0qHH-7paw6UQT9zM",
+      authDomain: "invoiding-database.firebaseapp.com",
+      databaseURL: "https://invoiding-database-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "invoiding-database",
+      storageBucket: "invoiding-database.firebasestorage.app",
+      messagingSenderId: "652678242016",
+      appId: "1:652678242016:web:eec953d046ae53e7f53a85"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    let activeCompany = { id: 1, name: "Kerabeaute" };
+    let allQuotes = [];
+
+    // Company abbreviation mapping
+    function getCompanyAbbr(name) {
+      const abbrMap = {
+        "Kerabeaute": "KB",
+        "Wilrichmyer": "WM",
+        "Tanttu": "TT",
+        "Rinse It": "RI"
+      };
+      return abbrMap[name] || name.substring(0, 2).toUpperCase();
+    }
+
+    async function syncContextWorkspaceRegistry() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) {
+        activeCompany = JSON.parse(saved);
+      }
+      document.querySelector('h1').textContent = `${activeCompany.name} - Quotations Ledger`;
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-button').forEach((btn, i) => {
+        btn.classList.toggle('border-b-4', i === tab);
+        btn.classList.toggle('border-emerald-600', i === tab);
+        btn.classList.toggle('text-emerald-700', i === tab);
+        btn.classList.toggle('text-gray-500', i !== tab);
+      });
+      document.getElementById('tabTitle').textContent = tab === 0 ? "Inbound Quotations" : "Outbound Quotations";
+      renderFilteredQuotes(tab);
+    }
+
+    function initFirebaseListener() {
+      const dbRefPath = 'approved_vendor_quotes/' + activeCompany.id;
+      const quotesRef = ref(db, dbRefPath);
+
+      onValue(quotesRef, (snapshot) => {
+        if (!snapshot.exists()) {
+          allQuotes = [];
+          renderFilteredQuotes(0);
+          return;
+        }
+        const data = snapshot.val();
+        allQuotes = Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse();
+        renderFilteredQuotes(0);
+      });
+    }
+
+    function renderFilteredQuotes(tab) {
+      const tbody = document.getElementById('quotesTableBody');
+      if (!tbody) return;
+
+      const filtered = allQuotes.filter(quote => {
+        const isOutbound = quote.type === "outbound";
+        return tab === 0 ? !isOutbound : isOutbound;
+      });
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" class="py-20 text-center text-gray-400">No quotations found</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      filtered.forEach(doc => {
+        const isOutbound = doc.type === "outbound";
+        const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50 transition-colors";
+        row.innerHTML = `
+          <td class="py-5 px-6 font-medium">${doc.ref}</td>
+          <td class="py-5 px-6 font-semibold">${doc.counterparty || doc.client || '—'}</td>
+          <td class="py-5 px-6 text-center">
+            <span class="inline-flex px-3 py-1 text-xs font-medium rounded-2xl ${isOutbound ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}">
+              ${isOutbound ? 'Outbound' : 'Inbound'}
+            </span>
+          </td>
+          <td class="py-5 px-6 text-center">${doc.itemsCount || (doc.items ? doc.items.length : 0)}</td>
+          <td class="py-5 px-6 text-right font-semibold text-emerald-600">${doc.value || '₹' + Number(doc.total || 0).toFixed(2)}</td>
+          <td class="py-5 px-6 text-gray-500">${doc.timestamp}</td>
+          <td class="py-5 px-6 text-center">
+            <span class="inline-flex items-center gap-1.5 ${isOutbound ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'} px-4 py-1 rounded-2xl text-xs font-semibold">
+              <i class="fas fa-check"></i> ${isOutbound ? 'Generated' : 'Approved'}
+            </span>
+          </td>
+          <td class="py-5 px-6 text-center">
+            <button onclick="downloadQuotationPDF('${doc.id}')" class="text-red-600 hover:text-red-700 transition-colors">
+              <i class="fas fa-file-pdf text-xl"></i>
+            </button>
+          </td>
+          <td class="py-5 px-6 text-center">
+            <button onclick="deleteSingleQuote('${doc.id}')" class="text-gray-400 hover:text-red-600 transition-colors">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    // PDF with Smaller Logo
+    window.downloadQuotationPDF = function(quoteId) {
+      const quote = allQuotes.find(q => q.id === quoteId);
+      if (!quote) return alert("Quotation not found");
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+
+      // Smaller Logo
+      if (activeCompany.logo) {
+        try {
+          pdf.addImage(activeCompany.logo, 'PNG', 20, 18, 30, 30);
+        } catch (e) {}
+      }
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+      pdf.text("QUOTATION", 105, 30, { align: "center" });
+
+      pdf.setFontSize(12);
+      pdf.text(activeCompany.name || "Company Name", 20, 62);
+
+      pdf.setFontSize(11);
+      pdf.text(`Reference: ${quote.ref}`, 20, 75);
+      pdf.text(`Date: ${quote.timestamp || new Date().toLocaleDateString('en-IN')}`, 20, 82);
+      pdf.text(`Party: ${quote.counterparty || quote.client || '—'}`, 20, 89);
+      pdf.text(`Type: ${quote.type === "outbound" ? "Outbound (To Client)" : "Inbound (From Vendor)"}`, 20, 96);
+
+      let tableData = [];
+      if (quote.items && quote.items.length > 0) {
+        quote.items.forEach(item => {
+          const desc = item.desc || item.description || item.name || "Item";
+          const qty = item.qty || 1;
+          const rate = parseFloat(item.price || item.rate || 0);
+          const amount = qty * rate;
+          tableData.push([desc, qty, rate.toFixed(2), amount.toFixed(2)]);
+        });
+      }
+
+      pdf.autoTable({
+        startY: 110,
+        head: [["Description", "Qty", "Rate (₹)", "Amount (₹)"]],
+        body: tableData,
+        theme: 'grid',
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255] }
+      });
+
+      const finalY = pdf.lastAutoTable.finalY + 15;
+
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Total: ${quote.value || '₹' + Number(quote.total || 0).toFixed(2)}`, 20, finalY);
+
+      pdf.setFontSize(10);
+      pdf.text("Thank you for your business!", 105, finalY + 25, { align: "center" });
+
+      pdf.save(`${quote.ref || 'Quotation'}.pdf`);
+    };
+
+    window.deleteSingleQuote = async function(quoteId) {
+      if (!confirm("Delete this quotation?")) return;
+      try {
+        await remove(ref(db, `approved_vendor_quotes/${activeCompany.id}/${quoteId}`));
+      } catch (e) {
+        alert("Failed to delete quotation.");
+      }
+    };
+
+    window.deleteAllQuotes = async function() {
+      if (!confirm(`Delete ALL quotations for ${activeCompany.name}?`)) return;
+      try {
+        await remove(ref(db, `approved_vendor_quotes/${activeCompany.id}`));
+      } catch (e) {
+        alert("Failed to delete all.");
+      }
+    };
+
+    window.switchTab = switchTab;
+
+    window.onload = function() {
+      syncContextWorkspaceRegistry().then(() => initFirebaseListener());
+    };
+  </script>
+</body>
+</html>

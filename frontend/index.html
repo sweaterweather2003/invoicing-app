@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoicing - Brand & Product Onboarding Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 min-h-screen py-12 px-6">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-12">
+      <h1 class="text-5xl font-black text-gray-900 tracking-tight mb-3">Enterprise Management Suite</h1>
+      <p class="text-xl text-gray-600">Select an existing workspace or declare new operational parameters</p>
+    </div>
+
+    <div id="mainGridContainer" class="grid grid-cols-1 max-w-2xl mx-auto gap-8 mb-12 transition-all duration-300">
+      <div class="bg-white border-2 border-black rounded-3xl p-8 shadow-sm transition-all" id="authCardContainer">
+        
+        <div id="registerHeader" class="flex items-center gap-3 mb-6">
+          <div class="p-3 bg-blue-100 text-blue-600 rounded-2xl"><i class="fas fa-copyright text-2xl"></i></div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Option 1: Create New Brand</h2>
+            <p class="text-sm text-gray-500">Establish a new commercial corporate entity layout</p>
+          </div>
+        </div>
+
+        <div id="loginHeader" class="flex items-center gap-3 mb-6 hidden">
+          <div class="p-3 bg-indigo-100 text-indigo-600 rounded-2xl"><i class="fas fa-fingerprint text-2xl"></i></div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Account Core Gateway Login</h2>
+            <p class="text-sm text-gray-500">Authenticate through assigned registration records</p>
+          </div>
+        </div>
+
+        <form id="brandForm" class="space-y-4">
+          
+          <div id="registrationOnlyFields" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Brand Name *</label>
+              <input type="text" id="newBrandName" required placeholder="e.g., Tanttu" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Corporate Email Address *</label>
+              <input type="email" id="newBrandEmail" required placeholder="name@company.com" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+              <div id="emailAlertMessage" class="hidden text-xs font-semibold text-red-600 mt-2 flex items-center gap-1">
+                <i class="fas fa-exclamation-circle"></i> Brand account already exists! Please switch to login mode.
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">Workspace Password *</label>
+              <input type="password" id="newBrandPassword" required placeholder="••••••••" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+            </div>
+          </div>
+
+          <div id="emailLookupWorkspaceArea" class="hidden space-y-3 bg-gray-50 border border-dashed border-gray-300 rounded-2xl p-4">
+            <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase"><i class="fas fa-search mr-1"></i> Associated Active Workspaces found:</label>
+            <div id="emailDropdownContainer">
+              <select id="loginTargetBrandSelect" class="w-full p-4 border-2 border-gray-200 bg-white rounded-xl focus:border-black outline-none transition-all">
+              </select>
+            </div>
+          </div>
+
+          <div id="registrationMetadataFields" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Tagline / Motto</label>
+              <input type="text" id="newBrandTagline" placeholder="e.g., Organic Skincare Formulas" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-2">Brand Accent Color</label>
+                <input type="color" id="newBrandColor" value="#3b82f6" class="w-full h-[58px] p-2 border-2 border-gray-200 rounded-xl cursor-pointer">
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-2">Logo Asset Upload</label>
+                <input type="file" id="newBrandLogo" accept="image/*" class="w-full p-3 border-2 border-gray-200 rounded-xl text-sm file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:bg-gray-100">
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <button type="submit" id="authActionButton" class="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition-all">
+              <i class="fas fa-plus mr-2"></i> Register Corporate Brand
+            </button>
+            
+            <div class="text-center mt-4">
+              <p id="toggleFormLink" class="text-sm font-semibold text-blue-600 hover:text-blue-800 cursor-pointer inline-block transition-colors">
+                Already have an account? Log in
+              </p>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="bg-white border-2 border-black rounded-3xl p-8 shadow-sm h-fit hidden" id="productCardContainer">
+        <div class="flex items-center gap-3 mb-6">
+          <div class="p-3 bg-emerald-100 text-emerald-600 rounded-2xl"><i class="fas fa-box-open text-2xl"></i></div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-900">Option 2: Add Product to Existing Brand</h2>
+            <p class="text-sm text-gray-500">Inject inventory SKUs immediately into operational lines</p>
+          </div>
+        </div>
+        <form id="productForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold mb-2">Target Corporate Brand *</label>
+            <select id="targetBrandSelect" required class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-2">Product Line Item Name *</label>
+            <input type="text" id="directProdName" required placeholder="e.g., Hydrating Silk Cleanser" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+          </div>
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Price (₹) *</label>
+              <input type="number" id="directProdPrice" required min="0" step="0.01" placeholder="1250" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">Initial Stock *</label>
+              <input type="number" id="directProdStock" required min="0" placeholder="100" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-2">Lead Time</label>
+              <input type="text" id="directProdLead" placeholder="3-5 Days" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+            </div>
+          </div>
+          <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl hover:bg-emerald-700 transition-all">
+            <i class="fas fa-check mr-2"></i> Inject Inventory Record
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div id="activeRegistriesWrapper" class="hidden">
+      <div class="border-t-2 border-dashed border-gray-300 pt-8 mb-6">
+        <h2 class="text-3xl font-bold text-gray-900 mb-2">Active Brand Registries</h2>
+        <p class="text-gray-500">Select an established entity instance to access financial channels and logistics</p>
+      </div>
+      <div class="space-y-4" id="companyGrid"></div>
+    </div>
+  </div>
+
+  <div id="loginModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+    <div class="bg-white border-2 border-black rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl transform scale-95 transition-transform duration-300" id="modalContainer">
+      <div class="flex justify-between items-center mb-6">
+        <h3 class="text-2xl font-black text-gray-900" id="modalTitle">Workspace Security Gate</h3>
+        <button id="closeModalBtn" class="text-gray-400 hover:text-black transition-colors"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      <form id="modalLoginForm">
+        <input type="hidden" id="modalTargetBrandId">
+        <div class="mb-4">
+          <label class="block text-sm font-semibold mb-2">Authorized Email</label>
+          <input type="email" id="modalEmail" readonly class="w-full p-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-500 outline-none">
+        </div>
+        <div class="mb-6">
+          <label class="block text-sm font-semibold mb-2">Enter Workspace Password *</label>
+          <input type="password" id="modalPassword" required placeholder="••••••••" class="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-black outline-none transition-all">
+        </div>
+        <button type="submit" class="w-full bg-black text-white font-bold py-4 rounded-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2">
+          <i class="fas fa-key"></i> Decrypt & Enter Workspace
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDO0N82vMalBzbNtNI0qHH-7paw6UQT9zM",
+      authDomain: "invoiding-database.firebaseapp.com",
+      projectId: "invoiding-database",
+      storageBucket: "invoiding-database.firebasestorage.app",
+      messagingSenderId: "652678242016",
+      appId: "1:652678242016:web:eec953d046ae53e7f53a85",
+      measurementId: "G-Y2X66C8B22"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let companies = [];
+    let isLoginMode = false;
+
+    async function initializeSystemStorage() {
+      try {
+        const querySnapshot = await getDocs(collection(db, "companies"));
+        companies = [];
+        querySnapshot.forEach((doc) => {
+          companies.push({ firestoreId: doc.id, ...doc.data() });
+        });
+        const currentEmail = document.getElementById('newBrandEmail').value;
+        renderBrandsDropdowns(currentEmail);
+        handleEmailInput(currentEmail);
+      } catch (error) {
+        console.error("Error connecting to live server data source: ", error);
+      }
+    }
+
+    function toggleAuthState() {
+      const gridContainer = document.getElementById('mainGridContainer');
+      const regHeader = document.getElementById('registerHeader');
+      const logHeader = document.getElementById('loginHeader');
+      const regOnlyFields = document.getElementById('registrationOnlyFields');
+      const regMetaFields = document.getElementById('registrationMetadataFields');
+      const brandNameInput = document.getElementById('newBrandName');
+      const actionBtn = document.getElementById('authActionButton');
+      const toggleLink = document.getElementById('toggleFormLink');
+      const lookupArea = document.getElementById('emailLookupWorkspaceArea');
+      const emailAlert = document.getElementById('emailAlertMessage');
+      const emailValue = document.getElementById('newBrandEmail').value;
+      const productCardContainer = document.getElementById('productCardContainer');
+
+      isLoginMode = !isLoginMode;
+
+      if (isLoginMode) {
+        gridContainer.className = "grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12 transition-all duration-300";
+        regHeader.classList.add('hidden');
+        logHeader.classList.remove('hidden');
+        regOnlyFields.classList.add('hidden');
+        regMetaFields.classList.add('hidden');
+        brandNameInput.removeAttribute('required');
+        emailAlert.classList.add('hidden');
+        productCardContainer.classList.remove('hidden');
+        
+        actionBtn.innerHTML = `<i class="fas fa-sign-in-alt mr-2"></i> Access Brand Workspace`;
+        toggleLink.textContent = "New here? Create corporate brand account";
+        
+        lookUpRegisteredCompaniesByEmail(emailValue);
+        renderBrandsDropdowns(emailValue);
+      } else {
+        gridContainer.className = "grid grid-cols-1 max-w-2xl mx-auto gap-8 mb-12 transition-all duration-300";
+        regHeader.classList.remove('hidden');
+        logHeader.classList.add('hidden');
+        regOnlyFields.classList.remove('hidden');
+        regMetaFields.classList.remove('hidden');
+        brandNameInput.setAttribute('required', 'true');
+        productCardContainer.classList.add('hidden');
+        
+        actionBtn.innerHTML = `<i class="fas fa-plus mr-2"></i> Register Corporate Brand`;
+        toggleLink.textContent = "Already have an account? Log in";
+        lookupArea.classList.add('hidden');
+        
+        handleEmailInput(emailValue);
+      }
+    }
+
+    function handleBrandNameInput() {
+      const emailValue = document.getElementById('newBrandEmail').value;
+      handleEmailInput(emailValue);
+    }
+
+    function handleEmailInput(emailVal) {
+      const sanitizedEmail = emailVal.trim().toLowerCase();
+      const sanitizedBrandName = document.getElementById('newBrandName').value.trim().toLowerCase();
+      const emailAlert = document.getElementById('emailAlertMessage');
+      const registriesWrapper = document.getElementById('activeRegistriesWrapper');
+
+      if (!sanitizedEmail) {
+        emailAlert.classList.add('hidden');
+        registriesWrapper.classList.add('hidden');
+        renderBrandsDropdowns('');
+        return;
+      }
+
+      const matchedByEmail = companies.filter(c => c.email && c.email.trim().toLowerCase() === sanitizedEmail);
+
+      if (!isLoginMode) {
+        const completeConflict = matchedByEmail.some(c => c.name && c.name.trim().toLowerCase() === sanitizedBrandName);
+        
+        if (completeConflict && sanitizedBrandName) {
+          emailAlert.classList.remove('hidden');
+        } else {
+          emailAlert.classList.add('hidden');
+        }
+
+        if (matchedByEmail.length > 0) {
+          registriesWrapper.classList.remove('hidden');
+          renderCompaniesGrid(matchedByEmail);
+        } else {
+          registriesWrapper.classList.add('hidden');
+        }
+      } else {
+        lookUpRegisteredCompaniesByEmail(emailVal);
+        renderBrandsDropdowns(emailVal);
+        if (matchedByEmail.length > 0) {
+          registriesWrapper.classList.remove('hidden');
+          renderCompaniesGrid(matchedByEmail);
+        } else {
+          registriesWrapper.classList.add('hidden');
+        }
+      }
+    }
+
+    function lookUpRegisteredCompaniesByEmail(emailVal) {
+      if (!isLoginMode) return;
+      
+      const sanitizedEmail = emailVal.trim().toLowerCase();
+      const lookupArea = document.getElementById('emailLookupWorkspaceArea');
+      const dropdownSelect = document.getElementById('loginTargetBrandSelect');
+      
+      if (!sanitizedEmail) {
+        lookupArea.classList.add('hidden');
+        dropdownSelect.innerHTML = '';
+        return;
+      }
+
+      const matchedCompanies = companies.filter(c => c.email && c.email.trim().toLowerCase() === sanitizedEmail);
+
+      if (matchedCompanies.length > 0) {
+        lookupArea.classList.remove('hidden');
+        dropdownSelect.innerHTML = matchedCompanies.map(c => `<option value="${c.id}">${c.name} (ID: ${c.id})</option>`).join('');
+      } else {
+        lookupArea.classList.remove('hidden');
+        dropdownSelect.innerHTML = `<option value="" disabled selected>No brands registered under this email</option>`;
+      }
+    }
+
+    function handleAuthSubmit(e) {
+      e.preventDefault();
+      if (isLoginMode) {
+        executeDirectPanelLogin();
+      } else {
+        const name = document.getElementById('newBrandName').value.trim().toLowerCase();
+        const email = document.getElementById('newBrandEmail').value.trim().toLowerCase();
+        
+        const conflictCheck = companies.some(c => c.email && c.email.trim().toLowerCase() === email && c.name && c.name.trim().toLowerCase() === name);
+        
+        if (conflictCheck) {
+          alert("❌ Action Terminated: This corporate brand is already registered under this operational email address. Please select 'Log in'.");
+          return;
+        }
+        createNewBrand();
+      }
+    }
+
+    function executeDirectPanelLogin() {
+      const email = document.getElementById('newBrandEmail').value.trim();
+      const password = document.getElementById('newBrandPassword').value;
+      const targetBrandId = Number(document.getElementById('loginTargetBrandSelect').value);
+
+      if (!targetBrandId) {
+        alert("❌ Operations Aborted: Please point to an authenticated workspace node list target row.");
+        return;
+      }
+
+      const selectedBrand = companies.find(c => c.id === targetBrandId);
+
+      if (selectedBrand && selectedBrand.password === password) {
+        localStorage.setItem('currentCompany', JSON.stringify(selectedBrand));
+        alert(`🔓 Welcome back to ${selectedBrand.name}! Routing workspace streams...`);
+        window.location.href = 'dashboard.html';
+      } else {
+        alert("❌ Access denied: Invalid password signature mapping for this targeted company layer.");
+      }
+    }
+
+    async function createNewBrand() {
+      const name = document.getElementById('newBrandName').value.trim();
+      const email = document.getElementById('newBrandEmail').value.trim();
+      const password = document.getElementById('newBrandPassword').value;
+      const tagline = document.getElementById('newBrandTagline').value.trim();
+      const color = document.getElementById('newBrandColor').value;
+      const fileInput = document.getElementById('newBrandLogo');
+
+      const nextId = companies.length > 0 ? Math.max(...companies.map(c => c.id)) + 1 : 1;
+
+      const proceed = async (logoSrc) => {
+        const newBrand = { id: nextId, name, email, password, logo: logoSrc, tagline, color };
+        
+        try {
+          await addDoc(collection(db, "companies"), newBrand);
+          await initializeSystemStorage();
+          
+          document.getElementById('brandForm').reset();
+          document.getElementById('emailAlertMessage').classList.add('hidden');
+          document.getElementById('activeRegistriesWrapper').classList.add('hidden');
+
+          const mailSubject = encodeURIComponent(`Account Confirmation - ${name} Invoicing Platform`);
+          const mailBody = encodeURIComponent(`Hello,\n\nYour onboarding pipeline is complete. You have successfully mapped your workspace parameters for "${name}" on our Invoicing App platform.\n\nWorkspace Profile:\nID Reference: ${nextId}\nAuthorized Email Target: ${email}\n\nRegards,\nEnterprise Core Ops Team`);
+          const mailtoLink = `mailto:${email}?subject=${mailSubject}&body=${mailBody}`;
+          
+          localStorage.setItem('currentCompany', JSON.stringify(newBrand));
+          alert(`✅ Brand "${name}" compiled and saved to Firebase cloud successfully!`);
+          
+          window.location.href = mailtoLink;
+          
+          setTimeout(() => {
+            window.location.href = 'dashboard.html';
+          }, 800);
+        } catch (err) {
+          console.error("Failed syncing registration parameters to Firebase backend:", err);
+          alert("❌ Operational Error: Could not verify connection with Firebase storage layers.");
+        }
+      };
+
+      if (fileInput.files && fileInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(evt) { proceed(evt.target.result); };
+        reader.readAsDataURL(fileInput.files[0]);
+      } else {
+        proceed(`https://placehold.co/150?text=${encodeURIComponent(name)}`);
+      }
+    }
+
+    function renderBrandsDropdowns(filterEmail = '') {
+      const select = document.getElementById('targetBrandSelect');
+      if (!select) return;
+
+      const sanitizedEmail = filterEmail.trim().toLowerCase();
+      const filteredCompanies = sanitizedEmail 
+        ? companies.filter(c => c.email && c.email.trim().toLowerCase() === sanitizedEmail)
+        : [];
+
+      if (filteredCompanies.length === 0) {
+        select.innerHTML = `<option value="" disabled selected>No matching registered brands found for this email</option>`;
+        return;
+      }
+      
+      select.innerHTML = filteredCompanies.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
+
+    function renderCompaniesGrid(filteredList = []) {
+      const grid = document.getElementById('companyGrid');
+      grid.innerHTML = '';
+
+      if (filteredList.length === 0) return;
+
+      filteredList.forEach(company => {
+        const card = document.createElement('div');
+        card.className = `bg-white border-2 border-gray-200 rounded-3xl shadow-sm hover:border-black transition-all cursor-pointer overflow-hidden group`;
+        card.innerHTML = `
+          <div class="flex flex-col md:flex-row items-center justify-between p-8 gap-6">
+            <div class="flex items-center gap-8">
+              <div class="w-24 h-24 flex-shrink-0 flex items-center justify-center bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                <img src="${company.logo}" alt="${company.name}" class="max-h-20 max-w-[80px] object-contain group-hover:scale-105 transition-transform">
+              </div>
+              <div>
+                <h3 class="text-3xl font-black text-gray-900">${company.name}</h3>
+                <p class="text-lg text-gray-500">${company.tagline || 'No tagline defined.'}</p>
+                <div class="flex gap-2 mt-2">
+                  <span class="text-xs px-2 py-1 rounded bg-gray-100 border text-gray-600 font-mono">ID: ${company.id}</span>
+                  <span class="text-xs px-2 py-1 rounded bg-blue-50 border border-blue-100 text-blue-600 font-mono">${company.email}</span>
+                  <span class="w-4 h-4 rounded-full border" style="background-color: ${company.color || '#000'}"></span>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <button class="bg-gray-100 border border-gray-300 text-gray-700 px-6 py-3 rounded-xl text-md font-semibold hover:bg-gray-200 transition-all flex items-center gap-2 export-excel-btn">
+                <i class="fas fa-file-excel text-green-600"></i> Export Sheet
+              </button>
+              <button class="bg-black text-white px-8 py-3 rounded-xl text-md font-bold hover:bg-gray-800 transition-all enter-workspace-btn">
+                Enter System Workspace
+              </button>
+            </div>
+          </div>
+        `;
+        
+        card.addEventListener('click', () => triggerWorkspaceLogin(company.id));
+        card.querySelector('.export-excel-btn').addEventListener('click', (event) => {
+          event.stopImmediatePropagation();
+          exportSingleBrandToExcel(company.id);
+        });
+        card.querySelector('.enter-workspace-btn').addEventListener('click', (event) => {
+          event.stopImmediatePropagation();
+          triggerWorkspaceLogin(company.id);
+        });
+
+        grid.appendChild(card);
+      });
+    }
+
+    function triggerWorkspaceLogin(id) {
+      const selected = companies.find(c => c.id === Number(id));
+      if (!selected) return;
+
+      document.getElementById('modalTargetBrandId').value = selected.id;
+      document.getElementById('modalTitle').innerText = `Enter ${selected.name}`;
+      document.getElementById('modalEmail').value = selected.email;
+      document.getElementById('modalPassword').value = '';
+
+      const modal = document.getElementById('loginModal');
+      const container = document.getElementById('modalContainer');
+      
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.remove('opacity-0');
+        container.classList.remove('scale-95');
+      }, 10);
+    }
+
+    function closeLoginModal() {
+      const modal = document.getElementById('loginModal');
+      const container = document.getElementById('modalContainer');
+      
+      modal.classList.add('opacity-0');
+      container.classList.add('scale-95');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+      }, 300);
+    }
+
+    function verifyGatewayCredentials(e) {
+      e.preventDefault();
+      const targetId = Number(document.getElementById('modalTargetBrandId').value);
+      const typedPassword = document.getElementById('modalPassword').value;
+
+      const targetCompany = companies.find(c => c.id === targetId);
+
+      if (targetCompany && targetCompany.password === typedPassword) {
+        localStorage.setItem('currentCompany', JSON.stringify(targetCompany));
+        closeLoginModal();
+        window.location.href = 'dashboard.html';
+      } else {
+        alert("❌ Access denied. The password parameters matched no workspace configurations.");
+      }
+    }
+
+    async function addProductDirectly(e) {
+      e.preventDefault();
+      const brandId = document.getElementById('targetBrandSelect').value;
+      if (!brandId) {
+        alert("Please map a valid matching brand entity layout before trying to inject stock lines.");
+        return;
+      }
+      
+      const name = document.getElementById('directProdName').value.trim();
+      const price = parseFloat(document.getElementById('directProdPrice').value) || 0;
+      const stock = parseInt(document.getElementById('directProdStock').value) || 0;
+      const leadTime = document.getElementById('directProdLead').value.trim() || "3-5 Days";
+
+      try {
+        await addDoc(collection(db, "products"), {
+          brandId: Number(brandId),
+          name,
+          price,
+          stock,
+          leadTime,
+          minThreshold: 10,
+          timestamp: serverTimestamp()        // ← Fixed: Now includes timestamp
+        });
+
+        document.getElementById('productForm').reset();
+        alert(`✅ Item configured and mapped straight into chosen brand inventory pipeline.`);
+      } catch (err) {
+        console.error("Could not upload inventory metrics to cloud instances:", err);
+        alert("Failed to save product.");
+      }
+    }
+
+    async function exportSingleBrandToExcel(brandId) {
+      const company = companies.find(c => c.id === Number(brandId));
+      if (!company) return;
+      
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += `Master Report for Brand: ${company.name}\n\n`;
+      csvContent += "INVENTORY PRODUCTS LISTING\nProduct Name,Price,Stock Available,Lead Time\n";
+      
+      try {
+        const querySnapshot = await getDocs(collection(db, "products"));
+        querySnapshot.forEach((doc) => {
+          const p = doc.data();
+          if (p.brandId === Number(brandId)) {
+            csvContent += `"${p.name || ''}",${p.price || 0},${p.stock || 0},"${p.leadTime || ''}"\n`;
+          }
+        });
+      } catch (err) {
+        console.error("Error drawing inventory lists for export pipelines:", err);
+      }
+      
+      csvContent += "\nFINANCIAL RECORD STREAMS\nDescription/Vendor,Email,Phone,Amount,Category\n";
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `${company.name.toLowerCase().replace(/\s+/g, '_')}_master_data.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Event Listeners
+    document.getElementById('toggleFormLink').addEventListener('click', toggleAuthState);
+    document.getElementById('brandForm').addEventListener('submit', handleAuthSubmit);
+    document.getElementById('productForm').addEventListener('submit', addProductDirectly);
+    document.getElementById('modalLoginForm').addEventListener('submit', verifyGatewayCredentials);
+    document.getElementById('closeModalBtn').addEventListener('click', closeLoginModal);
+    
+    document.getElementById('newBrandEmail').addEventListener('input', (e) => handleEmailInput(e.target.value));
+    document.getElementById('newBrandName').addEventListener('input', handleBrandNameInput);
+
+    window.addEventListener('DOMContentLoaded', initializeSystemStorage);
+  </script>
+</body>
+</html>

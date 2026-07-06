@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expenses & Corporate Outlays</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-50 p-8 font-sans">
+  <div class="max-w-7xl mx-auto">
+    <div class="flex justify-between items-center mb-8 border-b pb-4">
+      <div>
+        <div class="text-xs text-gray-400 font-bold uppercase tracking-widest"><i class="fas fa-wallet"></i> Financial Records Folder</div>
+        <h1 class="text-4xl font-black text-gray-900">Expenses & Vendors - <span id="companyTitle" class="text-blue-600"></span></h1>
+      </div>
+      <div class="flex gap-3">
+        <label class="bg-black text-white px-5 py-3 rounded-xl cursor-pointer flex items-center gap-2 font-bold text-sm shadow-sm">
+          <i class="fas fa-upload"></i> Bulk Import CSV/Excel
+          <input type="file" id="fileUpload" accept=".csv,.xlsx" class="hidden" onchange="handleFileUpload(event)">
+        </label>
+        <button onclick="deleteAllData()" class="bg-red-600 hover:bg-red-700 text-white font-bold px-5 py-3 rounded-xl text-sm shadow-sm transition-all">
+          <i class="fas fa-trash-alt"></i> Purge Accounts Logs
+        </button>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b bg-gray-50">
+        <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="Query expenses ledger description strings..." class="w-full p-3 bg-white border border-gray-200 rounded-xl outline-none text-sm focus:border-black font-medium">
+      </div>
+      <table class="w-full text-left">
+        <thead class="bg-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider border-b">
+          <tr>
+            <th class="p-4">Description / Vendor Name</th>
+            <th class="p-4">Email Address</th>
+            <th class="p-4">Contact Phone</th>
+            <th class="p-4 text-right">Settled Amount (₹)</th>
+            <th class="p-4 text-center">Category / Allocation Timestamp</th>
+            <th class="p-4 w-20 text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody" class="divide-y text-sm font-medium text-gray-700">
+          </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let data = [];
+    let currentCompany = { id: "1", name: "Kerabeaute" };
+
+    function loadCurrentCompany() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) {
+        currentCompany = JSON.parse(saved);
+      }
+      document.getElementById('companyTitle').textContent = currentCompany.name;
+      loadDataStream();
+    }
+
+    function loadDataStream() {
+      const key = 'expenses_' + currentCompany.id;
+      data = JSON.parse(localStorage.getItem(key) || '[]');
+      
+      if (data.length === 0) {
+        data = [
+          { name: "Bulk Bottle Supplier Matrix Logistics", email: "billing@apexglass.com", phone: "+91 9845011223", amount: 48000, category: "Raw Material Packaging" },
+          { name: "Server Grid Instance Compute Cluster", email: "aws-support@amazon.com", phone: "-", amount: 14500, category: "Cloud Infarstructure Stack" }
+        ];
+        localStorage.setItem(key, JSON.stringify(data));
+      }
+      renderTable();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+
+      data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50/50 transition-all border-b border-gray-100";
+        row.innerHTML = `
+          <td class="p-4 font-bold text-gray-900">${item.name}</td>
+          <td class="p-4 font-mono text-xs text-gray-500">${item.email || '-'}</td>
+          <td class="p-4 font-mono text-xs text-gray-500">${item.phone || '-'}</td>
+          <td class="p-4 text-right font-mono font-bold text-gray-900">₹${Number(item.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+          <td class="p-4 text-center text-xs"><span class="px-2.5 py-1 bg-gray-100 rounded-lg text-gray-600 border">${item.category || 'General'}</span></td>
+          <td class="p-4 text-center">
+            <button onclick="deleteItem(${index})" class="w-7 h-7 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center mx-auto transition-all">✕</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function deleteItem(index) {
+      if (confirm("Extract and purge this financial expenditure record log?")) {
+        data.splice(index, 1);
+        saveDataStream();
+        renderTable();
+      }
+    }
+
+    function deleteAllData() {
+      if (confirm("CRITICAL AUDIT: Entirely wipe accounts payable logs for this company instance?")) {
+        data = [];
+        saveDataStream();
+        renderTable();
+      }
+    }
+
+    function saveDataStream() {
+      const key = 'expenses_' + currentCompany.id;
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+
+    function filterTable() {
+      const term = document.getElementById('searchInput').value.toLowerCase().trim();
+      const rows = document.querySelectorAll('#tableBody tr');
+      rows.forEach((row, idx) => {
+        const targetText = (data[idx]?.name || '').toLowerCase();
+        if (targetText.includes(term)) row.classList.remove('hidden');
+        else row.classList.add('hidden');
+      });
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const workbook = XLSX.read(e.target.result, { type: 'array' });
+          const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+          
+          const parsed = json.map(r => ({
+            name: r["Vendor Name"] || r["Description"] || r["name"] || "Generic Supplier Record",
+            email: r["Email"] || r["email"] || "-",
+            phone: r["Phone"] || r["phone"] || "-",
+            amount: parseFloat(r["Amount"]) || parseFloat(r["amount"]) || 0,
+            category: r["Category"] || r["category"] || "Import Ledger Line"
+          }));
+
+          data = [...data, ...parsed];
+          saveDataStream();
+          renderTable();
+          alert(`✅ Bulk integrated ${parsed.length} spreadsheet records straight into brand books.`);
+        } catch (err) {
+          alert("Error parsing document file format framework strings: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    window.onload = loadCurrentCompany;
+  </script>
+</body>
+</html>

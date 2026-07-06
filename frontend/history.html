@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document History - Invoicing</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+  
+  <!-- jsPDF + AutoTable for PDF Download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-gray-50 font-sans">
+  <div class="max-w-7xl mx-auto p-8">
+    
+    <div class="flex items-center justify-between mb-10">
+      <div class="flex items-center gap-3">
+        <button onclick="location.href='dashboard.html'" class="w-10 h-10 bg-white border rounded-xl flex items-center justify-center hover:bg-gray-100 transition-all shadow-sm">
+          <i class="fas fa-arrow-left text-gray-600"></i>
+        </button>
+        <h1 class="text-4xl font-black text-gray-900 tracking-tight">Document History</h1>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="downloadCSV()" class="bg-emerald-600 text-white px-5 py-3 rounded-2xl font-semibold flex items-center gap-2 hover:bg-emerald-700 transition-all">
+          <i class="fas fa-download"></i> Download CSV
+        </button>
+        <button onclick="location.href='invoice.html'" class="bg-black text-white px-6 py-3 rounded-2xl font-semibold flex items-center gap-2 hover:bg-gray-800 transition-all">
+          <i class="fas fa-plus"></i> New Document
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="flex flex-wrap gap-2 mb-8 border-b border-gray-200 pb-4">
+      <button onclick="filterByType('all')" id="tab-all" class="tab-btn active px-6 py-3 rounded-2xl font-semibold text-sm transition-all flex items-center gap-2 bg-black text-white">
+        <i class="fas fa-th-large"></i> All
+      </button>
+      <button onclick="filterByType('invoice')" id="tab-invoice" class="tab-btn px-6 py-3 rounded-2xl font-semibold text-sm transition-all flex items-center gap-2 hover:bg-blue-50 text-blue-700">
+        <i class="fas fa-file-invoice"></i> Invoices
+      </button>
+      <button onclick="filterByType('proforma')" id="tab-proforma" class="tab-btn px-6 py-3 rounded-2xl font-semibold text-sm transition-all flex items-center gap-2 hover:bg-indigo-50 text-indigo-700">
+        <i class="fas fa-file-alt"></i> Proforma
+      </button>
+      <button onclick="filterByType('credit_note')" id="tab-credit_note" class="tab-btn px-6 py-3 rounded-2xl font-semibold text-sm transition-all flex items-center gap-2 hover:bg-red-50 text-red-700">
+        <i class="fas fa-minus-circle"></i> Credit Notes
+      </button>
+      <button onclick="filterByType('debit_note')" id="tab-debit_note" class="tab-btn px-6 py-3 rounded-2xl font-semibold text-sm transition-all flex items-center gap-2 hover:bg-cyan-50 text-cyan-700">
+        <i class="fas fa-plus-circle"></i> Debit Notes
+      </button>
+    </div>
+
+    <div class="flex gap-4 mb-6">
+      <input id="searchInput" type="text" placeholder="Search by reference or customer..." 
+             onkeyup="filterDocuments()" 
+             class="flex-1 p-4 border border-gray-200 rounded-2xl focus:border-black outline-none">
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden">
+      <table class="w-full" id="historyTable">
+        <thead class="bg-gray-50">
+          <tr class="text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <th class="px-6 py-5">Reference</th>
+            <th class="px-6 py-5">Type</th>
+            <th class="px-6 py-5">Counterparty</th>
+            <th class="px-6 py-5">Amount</th>
+            <th class="px-6 py-5">Date</th>
+            <th class="px-6 py-5 text-center">PDF</th>
+            <th class="px-6 py-5 text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody" class="divide-y divide-gray-100 text-sm"></tbody>
+      </table>
+    </div>
+
+    <div id="noData" class="hidden text-center py-20">
+      <i class="fas fa-file-alt text-6xl text-gray-300 mb-4"></i>
+      <p class="text-gray-500 text-lg">No documents found</p>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDO0N82vMalBzbNtNI0qHH-7paw6UQT9zM",
+      authDomain: "invoiding-database.firebaseapp.com",
+      databaseURL: "https://invoiding-database-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "invoiding-database",
+      storageBucket: "invoiding-database.firebasestorage.app",
+      messagingSenderId: "652678242016",
+      appId: "1:652678242016:web:eec953d046ae53e7f53a85"
+    };
+
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let activeCompany = { id: 1 };
+    let allDocuments = [];
+    let currentFilter = 'all';
+
+    function syncCompany() {
+      const saved = localStorage.getItem('currentCompany');
+      if (saved) activeCompany = JSON.parse(saved);
+    }
+
+    async function loadHistory() {
+      syncCompany();
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-black mx-auto"></div></td></tr>`;
+
+      try {
+        const snapshot = await db.ref('companies/' + activeCompany.id + '/documents').once('value');
+        const docs = snapshot.val();
+
+        if (!docs) {
+          document.getElementById('noData').classList.remove('hidden');
+          return;
+        }
+
+        allDocuments = Object.keys(docs).map(key => ({
+          id: key,
+          ...docs[key]
+        })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        filterDocuments();
+
+      } catch (error) {
+        console.error(error);
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-12 text-red-600">Failed to load documents</td></tr>`;
+      }
+    }
+
+    function renderTable(documents) {
+      const tbody = document.getElementById('tableBody');
+      const noData = document.getElementById('noData');
+      tbody.innerHTML = '';
+
+      if (documents.length === 0) {
+        noData.classList.remove('hidden');
+        return;
+      }
+
+      noData.classList.add('hidden');
+
+      documents.forEach(doc => {
+        const date = new Date(doc.timestamp);
+        const row = document.createElement('tr');
+        row.className = "hover:bg-gray-50 transition-colors";
+        row.innerHTML = `
+          <td class="px-6 py-5 font-mono font-medium">${doc.ref}</td>
+          <td class="px-6 py-5">
+            <span class="px-3 py-1 text-xs font-bold rounded-full ${getTypeColor(doc.type)}">
+              ${doc.type ? doc.type.replace('_', ' ').toUpperCase() : 'DOCUMENT'}
+            </span>
+          </td>
+          <td class="px-6 py-5">${doc.counterparty || 'Unknown'}</td>
+          <td class="px-6 py-5 font-semibold">${doc.value}</td>
+          <td class="px-6 py-5 text-gray-500">${date.toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'})}</td>
+          <td class="px-6 py-5 text-center">
+            <button onclick="downloadDocumentPDF('${doc.id}')" class="text-red-600 hover:text-red-700 transition-colors">
+              <i class="fas fa-file-pdf text-xl"></i>
+            </button>
+          </td>
+          <td class="px-6 py-5 text-center">
+            <button onclick="deleteDocument('${doc.id}')" class="text-red-500 hover:text-red-700 transition-colors">
+              <i class="fas fa-trash"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function getTypeColor(type) {
+      const colors = {
+        invoice: 'bg-blue-100 text-blue-700',
+        proforma: 'bg-indigo-100 text-indigo-700',
+        credit_note: 'bg-red-100 text-red-700',
+        debit_note: 'bg-cyan-100 text-cyan-700'
+      };
+      return colors[type] || 'bg-gray-100 text-gray-700';
+    }
+
+    function filterByType(type) {
+      currentFilter = type;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active', 'bg-black', 'text-white'));
+      document.getElementById(`tab-${type}`).classList.add('active', 'bg-black', 'text-white');
+      filterDocuments();
+    }
+
+    function filterDocuments() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase().trim();
+      let filtered = allDocuments;
+
+      if (currentFilter !== 'all') {
+        filtered = filtered.filter(doc => doc.type === currentFilter);
+      }
+
+      if (searchTerm) {
+        filtered = filtered.filter(doc => 
+          (doc.ref && doc.ref.toLowerCase().includes(searchTerm)) ||
+          (doc.counterparty && doc.counterparty.toLowerCase().includes(searchTerm))
+        );
+      }
+
+      renderTable(filtered);
+    }
+
+    // ==================== PDF DOWNLOAD (Same style as vendor_quotations) ====================
+    window.downloadDocumentPDF = function(docId) {
+      const doc = allDocuments.find(d => d.id === docId);
+      if (!doc) return alert("Document not found");
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+
+      // Logo
+      if (activeCompany.logo) {
+        try {
+          pdf.addImage(activeCompany.logo, 'PNG', 20, 15, 35, 35);
+        } catch (e) {}
+      }
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(22);
+      pdf.text(doc.type ? doc.type.replace('_', ' ').toUpperCase() : "DOCUMENT", 105, 35, { align: "center" });
+
+      pdf.setFontSize(12);
+      pdf.text(activeCompany.name || "Company Name", 20, 65);
+
+      pdf.setFontSize(11);
+      pdf.text(`Reference: ${doc.ref}`, 20, 78);
+      pdf.text(`Date: ${new Date(doc.timestamp).toLocaleDateString('en-IN')}`, 20, 85);
+      pdf.text(`Party: ${doc.counterparty || '—'}`, 20, 92);
+
+      let tableData = [];
+      if (doc.items && doc.items.length > 0) {
+        doc.items.forEach(item => {
+          const desc = item.description || item.name || "Item";
+          const qty = item.qty || 1;
+          const rate = parseFloat(item.rate || item.price || 0);
+          const amount = qty * rate;
+          tableData.push([desc, qty, rate.toFixed(2), amount.toFixed(2)]);
+        });
+      } else {
+        tableData.push(["Service/Product", 1, "0.00", "0.00"]);
+      }
+
+      pdf.autoTable({
+        startY: 105,
+        head: [["Description", "Qty", "Rate (₹)", "Amount (₹)"]],
+        body: tableData,
+        theme: 'grid',
+        styles: { fontSize: 10 },
+        headStyles: { fillColor: [0, 0, 0], textColor: [255, 255, 255] }
+      });
+
+      const finalY = pdf.lastAutoTable.finalY + 15;
+
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Total: ${doc.value || '₹0.00'}`, 20, finalY);
+
+      pdf.setFontSize(10);
+      pdf.text("Thank you for your business!", 105, finalY + 25, { align: "center" });
+
+      pdf.save(`${doc.ref || 'Document'}.pdf`);
+    };
+
+    async function deleteDocument(docId) {
+      if (!confirm("Are you sure you want to delete this document?")) return;
+
+      try {
+        await db.ref(`companies/${activeCompany.id}/documents/${docId}`).remove();
+        alert("Document deleted successfully");
+        loadHistory();
+      } catch (error) {
+        alert("Failed to delete document");
+        console.error(error);
+      }
+    }
+
+    function downloadCSV() {
+      if (allDocuments.length === 0) {
+        alert("No documents to export");
+        return;
+      }
+
+      let csv = "Reference,Type,Counterparty,Amount,Date,State\n";
+      
+      allDocuments.forEach(doc => {
+        const date = new Date(doc.timestamp).toLocaleDateString();
+        csv += `"${doc.ref}","${doc.type}","${doc.counterparty || ''}","${doc.value}","${date}","${doc.state || ''}"\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `document_history_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+    }
+
+    window.onload = loadHistory;
+  </script>
+</body>
+</html>
