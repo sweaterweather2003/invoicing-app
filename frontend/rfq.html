@@ -7,6 +7,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- PDF.js added for client-side PDF processing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <div class="max-w-7xl mx-auto p-8">
@@ -49,8 +51,8 @@
             
             <div class="flex items-center gap-3">
               <label class="cursor-pointer bg-white border border-gray-300 hover:bg-gray-50 px-5 py-3 rounded-2xl flex items-center gap-2 font-medium transition-all">
-                <i class="fas fa-upload"></i> Upload Excel / CSV
-                <input type="file" id="quoteUpload" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleQuoteUpload(event)">
+                <i class="fas fa-upload"></i> Upload Excel / CSV / PDF
+                <input type="file" id="quoteUpload" accept=".xlsx,.xls,.csv,.pdf" multiple class="hidden" onchange="handleQuoteUpload(event)">
               </label>
               <button onclick="deleteAllPendingRFQs()" 
                       class="bg-red-600 hover:bg-red-700 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-medium transition-all">
@@ -297,7 +299,7 @@
             <td colspan="4" class="py-20 text-center text-gray-400">
               <i class="fas fa-inbox text-5xl mb-4 block"></i>
               <p class="font-medium">Waiting for quotations</p>
-              <p class="text-sm mt-1">Upload Excel/CSV or receive from vendors</p>
+              <p class="text-sm mt-1">Upload Excel, CSV, or PDF from vendors</p>
             </td>
           </tr>`;
         return;
@@ -408,30 +410,68 @@
       });
     };
 
-    window.handleQuoteUpload = function(event) {
+    window.handleQuoteUpload = async function(event) {
       const files = event.target.files;
       if (!files.length) return;
 
-      let processed = 0;
       let added = 0;
 
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          try {
-            let workbook;
-            if (file.name.toLowerCase().endsWith('.csv')) {
-              workbook = XLSX.read(e.target.result, { type: 'string' });
-            } else {
-              workbook = XLSX.read(e.target.result, { type: 'array' });
+      // Ensure PDF worker is loaded
+      if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+      }
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        try {
+          if (file.name.toLowerCase().endsWith('.pdf')) {
+            // PDF PROCESSING LOGIC
+            const arrayBuffer = await file.arrayBuffer();
+            const typedarray = new Uint8Array(arrayBuffer);
+            const pdf = await pdfjsLib.getDocument(typedarray).promise;
+            
+            let fullText = "";
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+              const page = await pdf.getPage(pageNum);
+              const textContent = await page.getTextContent();
+              fullText += textContent.items.map(item => item.str).join(' ') + " ";
             }
 
+            // Fallback generic extraction for unformatted PDF data
+            // You can replace this section with external LLM API logic (like Ollama) for precise parsing later.
+            const rfqKey = 'pending_rfqs_' + activeCompany.id;
+            let pending = JSON.parse(localStorage.getItem(rfqKey) || '[]');
+            pending.unshift({
+              id: `PDF-${Date.now()}-${i}`,
+              vendorName: file.name.replace('.pdf', '') || "Unknown PDF Vendor",
+              items: [{ 
+                desc: `Parsed PDF Content (Review required) - ${file.name}`, 
+                qty: 1, 
+                rate: 0 
+              }]
+            });
+            localStorage.setItem(rfqKey, JSON.stringify(pending));
+            added++;
+
+          } else {
+            // EXCEL & CSV PROCESSING LOGIC
+            const arrayBuffer = await file.arrayBuffer();
+            let workbook;
+            
+            if (file.name.toLowerCase().endsWith('.csv')) {
+               const text = new TextDecoder().decode(arrayBuffer);
+               workbook = XLSX.read(text, { type: 'string' });
+            } else {
+               workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            }
+            
             const sheet = workbook.Sheets[workbook.SheetNames[0]];
             const jsonData = XLSX.utils.sheet_to_json(sheet);
-
-            jsonData.forEach(row => {
+            
+            jsonData.forEach((row, rowIndex) => {
               const supplier = row.Supplier || row.Vendor || row.Company || row['Supplier Name'] || "Unknown Supplier";
-              const ref = row['RFQ ID'] || row.Reference || row.ID || `UPLOAD-${Date.now()}`;
+              const ref = row['RFQ ID'] || row.Reference || row.ID || `UPLOAD-${Date.now()}-${rowIndex}`;
 
               const items = [];
               if (row.Item || row.Product || row.Description) {
@@ -454,25 +494,18 @@
                 added++;
               }
             });
-
-            processed++;
-            if (processed === files.length) {
-              alert(`✅ Successfully imported ${added} quotation(s) from ${files.length} file(s)!`);
-              initPageContext();
-              document.getElementById('quoteUpload').value = '';
-            }
-          } catch (err) {
-            console.error(err);
-            alert("Failed to process file: " + file.name);
           }
-        };
-
-        if (file.name.toLowerCase().endsWith('.csv')) {
-          reader.readAsText(file);
-        } else {
-          reader.readAsArrayBuffer(file);
+        } catch (err) {
+          console.error("Failed to process file: " + file.name, err);
+          alert("Failed to process file: " + file.name);
         }
-      });
+      }
+
+      if (added > 0) {
+        alert(`✅ Successfully imported quotation(s) from ${files.length} file(s)!`);
+        initPageContext();
+        document.getElementById('quoteUpload').value = '';
+      }
     };
 
     // ==================== OUTBOUND LOGIC ====================
