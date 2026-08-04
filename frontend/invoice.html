@@ -12,29 +12,25 @@
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
   <!-- Tesseract.js for OCR -->
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <!-- pdf.js for PDF text extraction + page rendering -->
+  <script>
+    window.pdfjsReady = new Promise(async (resolve) => {
+      const pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+      window.pdfjsLib = pdfjsLib;
+      resolve(pdfjsLib);
+    });
+  </script>
   <style>
     @media print {
-      body * {
-        visibility: hidden;
-      }
-      #printableArea, #printableArea * {
-        visibility: visible;
-      }
+      body * { visibility: hidden; }
+      #printableArea, #printableArea * { visibility: visible; }
       #printableArea {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        padding: 40px 50px;
-        background: white;
+        position: absolute; left: 0; top: 0; width: 100%;
+        padding: 40px 50px; background: white;
       }
-      .no-print {
-        display: none !important;
-      }
-      input, select {
-        border: none !important;
-        background: transparent !important;
-      }
+      .no-print { display: none !important; }
+      input, select { border: none !important; background: transparent !important; }
     }
   </style>
 </head>
@@ -50,7 +46,7 @@
       <span id="docTypeBadge" class="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest bg-blue-100 text-blue-800">FINANCIAL ENGINE</span>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
- 
+
       <!-- MAIN INVOICE CONTENT -->
       <div class="col-span-12 lg:col-span-8">
         <div id="printableArea" class="bg-white rounded-3xl border border-gray-200 shadow-sm p-8">
@@ -84,7 +80,6 @@
             <div>
               <label class="block text-xs font-bold text-gray-400 tracking-wider uppercase mb-2" id="partyLabel">Target Customer / Client Entity</label>
               <select id="clientSelect" onchange="handleClientSelectChange()" class="w-full p-4 border border-gray-200 rounded-2xl bg-white focus:border-black outline-none transition-all">
-                <!-- Populated dynamically -->
               </select>
             </div>
             <div>
@@ -116,12 +111,12 @@
                 <i class="fas fa-plus"></i> Add from Inventory
               </button>
               <button onclick="document.getElementById('billUpload').click()" class="no-print bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
-                <i class="fas fa-file-upload"></i> Upload Bill / Receipt
+                <i class="fas fa-file-pdf"></i> Upload Bill (PDF / Image)
               </button>
-              <input type="file" id="billUpload" accept="image/*" class="hidden" onchange="handleBillUpload(event)">
+              <input type="file" id="billUpload" accept="application/pdf,image/*" class="hidden" onchange="handleBillUpload(event)">
             </div>
           </div>
-     
+
           <div class="overflow-x-auto border border-gray-200 rounded-2xl mb-4 shadow-sm">
             <table class="w-full" id="itemsTable">
               <thead>
@@ -134,8 +129,7 @@
                   <th class="p-4 w-16 text-center">Delete</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-gray-100 font-medium">
-              </tbody>
+              <tbody class="divide-y divide-gray-100 font-medium"></tbody>
             </table>
           </div>
           <button id="addItemBtn" onclick="addItemRow()" class="no-print bg-black text-white px-6 py-3 rounded-xl font-bold text-sm transition-all hover:bg-gray-800 shadow-sm flex items-center gap-1">
@@ -159,6 +153,7 @@
           </div>
         </div>
       </div>
+
       <!-- SIDEBAR -->
       <div class="col-span-12 lg:col-span-4 space-y-6 no-print">
         <div class="bg-white rounded-3xl border border-gray-200 shadow-sm p-6">
@@ -167,11 +162,9 @@
             <button id="primaryActionBtn" onclick="commitDocumentToConsoleLog()" class="w-full py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2">
               <i class="fas fa-save"></i> Execute & Log Document
             </button>
-          
             <button onclick="sendInvoiceByEmail()" class="w-full py-4 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-sm flex items-center justify-center gap-2">
               <i class="fas fa-paper-plane"></i> Save & Send via Email
             </button>
-          
             <button onclick="window.print()" class="w-full py-4 border-2 border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
               <i class="fas fa-print"></i> Generate Local Print / PDF
             </button>
@@ -226,7 +219,7 @@
     </div>
   </div>
 
-  <!-- Bill Upload / OCR Review Modal -->
+  <!-- Bill Review Modal -->
   <div id="billReviewModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-50 p-4">
     <div class="bg-white rounded-3xl max-w-3xl w-full p-8 max-h-[90vh] overflow-hidden flex flex-col">
       <div class="flex items-center justify-between mb-4">
@@ -235,12 +228,9 @@
           <i class="fas fa-times"></i>
         </button>
       </div>
-      <p class="text-sm text-gray-500 mb-4">OCR results may need small corrections. Edit any field below, then click <strong>Add All to Table</strong>.</p>
-      
-      <div id="ocrStatus" class="hidden mb-4 p-3 rounded-xl text-sm font-medium"></div>
-      
+      <p class="text-sm text-gray-500 mb-4">Results may need small corrections. Edit any field, then click <strong>Add All to Table</strong>.</p>
       <div class="flex-1 overflow-auto border border-gray-200 rounded-2xl">
-        <table class="w-full" id="ocrItemsTable">
+        <table class="w-full">
           <thead class="bg-gray-50 sticky top-0">
             <tr class="text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
               <th class="p-3">Description</th>
@@ -250,11 +240,9 @@
               <th class="p-3 w-14 text-center">Del</th>
             </tr>
           </thead>
-          <tbody id="ocrItemsBody" class="divide-y divide-gray-100">
-          </tbody>
+          <tbody id="ocrItemsBody" class="divide-y divide-gray-100"></tbody>
         </table>
       </div>
-      
       <div class="flex gap-3 mt-6">
         <button onclick="hideBillReviewModal()" class="flex-1 py-3 border border-gray-300 rounded-2xl font-medium">Cancel</button>
         <button onclick="addOCRItemsToTable()" class="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-bold flex items-center justify-center gap-2">
@@ -264,12 +252,12 @@
     </div>
   </div>
 
-  <!-- OCR Processing Overlay -->
+  <!-- Processing Overlay -->
   <div id="ocrOverlay" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-[60]">
     <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center">
       <div class="w-16 h-16 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
       <h3 class="text-lg font-bold text-gray-900 mb-1">Reading Bill...</h3>
-      <p id="ocrProgressText" class="text-sm text-gray-500">Initializing OCR engine</p>
+      <p id="ocrProgressText" class="text-sm text-gray-500">Initializing</p>
     </div>
   </div>
 
@@ -291,22 +279,19 @@
     let allClients = [];
     let extractedOCRItems = [];
 
-    // ==================== CLIENTS LOGIC ====================
+    // ==================== CLIENTS ====================
     async function loadClientsForInvoice() {
       allClients = [];
       try {
         const snapshot = await firestore.collection("clients").where("brandId", "==", activeCompany.id).get();
         snapshot.forEach(doc => allClients.push({ id: doc.id, ...doc.data() }));
-      } catch (e) {
-        console.error("Error loading clients:", e);
-      }
+      } catch (e) { console.error("Error loading clients:", e); }
       renderClientSelect();
     }
 
     function renderClientSelect() {
       const select = document.getElementById('clientSelect');
-      let html = `<option value="">Choose Client</option>`;
-      html += `<option value="add_new">+ Add New Client</option>`;
+      let html = `<option value="">Choose Client</option><option value="add_new">+ Add New Client</option>`;
       allClients.forEach(c => {
         html += `<option value="${c.id}" data-email="${c.email || ''}">${c.name} ${c.email ? `(${c.email})` : ''}</option>`;
       });
@@ -329,7 +314,6 @@
       document.getElementById('addClientModal').classList.remove('hidden');
       document.getElementById('addClientModal').classList.add('flex');
     }
-
     function hideAddClientModal() {
       document.getElementById('addClientModal').classList.add('hidden');
       document.getElementById('addClientModal').classList.remove('flex');
@@ -356,25 +340,21 @@
       }
     }
 
-    // ==================== ORIGINAL FUNCTIONS ====================
+    // ==================== CORE UI ====================
     function syncInterfaceContext() {
       const saved = localStorage.getItem('currentCompany');
-      if (saved) {
-        activeCompany = JSON.parse(saved);
-      }
+      if (saved) activeCompany = JSON.parse(saved);
       document.getElementById('companyName').value = activeCompany.name;
       document.getElementById('logoContainer').innerHTML = `<img src="${activeCompany.logo}" class="max-w-full max-h-full object-contain">`;
- 
       const themeColor = activeCompany.color || '#3b82f6';
       const actionBtn = document.getElementById('addItemBtn');
       if (actionBtn) actionBtn.style.backgroundColor = themeColor;
       const urlParams = new URLSearchParams(window.location.search);
-      const documentTypeMode = urlParams.get('type') || 'invoice';
- 
-      document.getElementById('docType').value = documentTypeMode;
+      document.getElementById('docType').value = urlParams.get('type') || 'invoice';
       updateDocumentType();
       addItemRow();
     }
+
     function updateDocumentType() {
       const selectedType = document.getElementById('docType').value;
       const title = document.getElementById('documentTitle');
@@ -421,6 +401,7 @@
       }
       document.getElementById('docNumber').value = `${serialPrefix}-${dateStr}-01`;
     }
+
     function addItemRow() {
       const tbody = document.querySelector('#itemsTable tbody');
       const row = document.createElement('tr');
@@ -436,6 +417,7 @@
       tbody.appendChild(row);
       calculateTotal();
     }
+
     function removeLineItemRow(btn) {
       const row = btn.closest('tr');
       const tbody = document.querySelector('#itemsTable tbody');
@@ -446,13 +428,14 @@
         alert("At least one transactional line item must remain present.");
       }
     }
+
     function calculateTotal() {
       const rows = document.querySelectorAll('#itemsTable tbody tr');
       let subtotalSum = 0;
       let calculatedTaxSum = 0;
       const state = document.getElementById('stateSelect').value;
       let jurisdictionalTaxBase = 0;
-      if (state === 'DOM') jurisdictionalTaxBase = 18.00;
+      if (state === 'DOM') jurisdictionalTaxBase = 18;
       else if (state === '5') jurisdictionalTaxBase = 5;
       else if (state === '12') jurisdictionalTaxBase = 12;
       else if (state === '18') jurisdictionalTaxBase = 18;
@@ -461,6 +444,7 @@
       else if (state === '3') jurisdictionalTaxBase = 3;
       else if (state === '0.25') jurisdictionalTaxBase = 0.25;
       else jurisdictionalTaxBase = parseFloat(state) || 0;
+
       rows.forEach(row => {
         const qtyEl = row.querySelector('.qtyInput');
         const rateEl = row.querySelector('.rateInput');
@@ -476,11 +460,11 @@
         subtotalSum += netRowAmount;
         calculatedTaxSum += rowTaxAmountValue;
       });
-      const grandTotalSum = subtotalSum + calculatedTaxSum;
       document.getElementById('subtotal').textContent = '₹' + subtotalSum.toFixed(2);
       document.getElementById('taxAmount').textContent = '₹' + calculatedTaxSum.toFixed(2);
-      document.getElementById('grandTotal').textContent = '₹' + grandTotalSum.toFixed(2);
+      document.getElementById('grandTotal').textContent = '₹' + (subtotalSum + calculatedTaxSum).toFixed(2);
     }
+
     async function saveDocumentToFirebase(docData) {
       try {
         const companyRef = db.ref('companies/' + activeCompany.id);
@@ -494,7 +478,6 @@
       }
     }
 
-    // ==================== FUZZY STOCK ADJUSTMENT ====================
     function fuzzyMatch(str1, str2) {
       if (!str1 || !str2) return false;
       const s1 = str1.toLowerCase().trim();
@@ -507,7 +490,6 @@
       const shouldIncrease = ['purchase_order', 'credit_note'].includes(docType);
       const snapshot = await firestore.collection("products").where("brandId", "==", activeCompany.id).get();
       const batch = firestore.batch();
-
       for (const item of items) {
         snapshot.forEach(doc => {
           const product = doc.data();
@@ -516,16 +498,13 @@
             let newStock = currentStock;
             if (shouldDecrease) newStock = Math.max(0, currentStock - item.qty);
             if (shouldIncrease) newStock = currentStock + item.qty;
-            if (newStock !== currentStock) {
-              batch.update(doc.ref, { stock: newStock });
-            }
+            if (newStock !== currentStock) batch.update(doc.ref, { stock: newStock });
           }
         });
       }
       await batch.commit();
     }
 
-    // ==================== SAVE DOCUMENT (Used by both buttons) ====================
     async function saveAndLogDocument(isEmailSend = false) {
       const type = document.getElementById('docType').value;
       const serialNum = document.getElementById('docNumber').value;
@@ -540,9 +519,7 @@
         const qty = parseInt(row.querySelector('.qtyInput').value) || 0;
         const rate = parseFloat(row.querySelector('.rateInput').value) || 0;
         const tax = parseFloat(row.querySelector('.taxInput').value) || 0;
-        if (description && qty > 0) {
-          items.push({ description, qty, rate, tax });
-        }
+        if (description && qty > 0) items.push({ description, qty, rate, tax });
       });
 
       const docData = {
@@ -558,11 +535,7 @@
 
       const saveSuccess = await saveDocumentToFirebase(docData);
       if (saveSuccess) {
-        try {
-          await adjustStockForDocument(items, type);
-        } catch (e) {
-          console.warn("Stock adjustment skipped");
-        }
+        try { await adjustStockForDocument(items, type); } catch (e) { console.warn("Stock adjustment skipped"); }
         return true;
       }
       return false;
@@ -577,13 +550,11 @@
       });
     }
 
-    // ==================== EMAIL + SAVE ====================
     window.sendInvoiceByEmail = async function() {
       const clientEmail = document.getElementById('clientEmail').value.trim();
       if (!clientEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clientEmail)) {
         return alert("Please enter a valid client email address.");
       }
-
       const saved = await saveAndLogDocument(true);
       if (!saved) return;
 
@@ -599,9 +570,7 @@
         const description = descInput ? descInput.value.trim() : 'Item';
         const qty = parseInt(row.querySelector('.qtyInput').value) || 0;
         const rate = parseFloat(row.querySelector('.rateInput').value) || 0;
-        if (description && qty > 0) {
-          items.push({ name: description, qty: qty, price: rate });
-        }
+        if (description && qty > 0) items.push({ name: description, qty: qty, price: rate });
       });
       const dynamicData = {
         type: "Invoice",
@@ -617,10 +586,7 @@
         const response = await fetch('/api/send-document', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            toEmail: clientEmail,
-            dynamicData: dynamicData
-          })
+          body: JSON.stringify({ toEmail: clientEmail, dynamicData: dynamicData })
         });
         const result = await response.json();
         if (result.success) {
@@ -635,15 +601,13 @@
       }
     };
 
-    // Product functions
+    // ==================== PRODUCTS ====================
     async function loadProductsForInvoice() {
       allProducts = [];
       try {
         const snapshot = await firestore.collection("products").where("brandId", "==", activeCompany.id).get();
         snapshot.forEach(doc => allProducts.push({ id: doc.id, ...doc.data() }));
-      } catch (e) {
-        console.error("Error loading products:", e);
-      }
+      } catch (e) { console.error("Error loading products:", e); }
     }
     function showAddProductModal() {
       loadProductsForInvoice().then(() => renderProductList());
@@ -669,7 +633,7 @@
             <div class="font-medium">${p.name}</div>
             <div class="text-sm text-gray-500">₹${Number(p.price || 0).toFixed(2)}</div>
           </div>
-          <button onclick="addProductToTable(${index}); event.stopImmediatePropagation()" 
+          <button onclick="addProductToTable(${index}); event.stopImmediatePropagation()"
                   class="bg-emerald-600 text-white px-5 py-2 rounded-2xl text-sm font-medium">Add</button>
         `;
         container.appendChild(div);
@@ -677,8 +641,7 @@
     }
     window.filterProducts = function() {
       const term = document.getElementById('searchProducts').value.toLowerCase().trim();
-      const filtered = allProducts.filter(p => p.name.toLowerCase().includes(term));
-      renderProductList(filtered);
+      renderProductList(allProducts.filter(p => p.name.toLowerCase().includes(term)));
     };
     window.addProductToTable = function(index) {
       const product = allProducts[index];
@@ -698,45 +661,37 @@
       hideAddProductModal();
     };
 
-    // ==================== BILL UPLOAD + OCR ====================
+    // ==================== BILL UPLOAD (PDF + IMAGE) ====================
     async function handleBillUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
-
       event.target.value = '';
 
-      if (!file.type.startsWith('image/')) {
-        alert('Please upload an image (JPG, PNG, WEBP, etc.). PDF support coming soon.');
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      const isImage = file.type.startsWith('image/');
+
+      if (!isPdf && !isImage) {
+        alert('Please upload a PDF or an image (JPG, PNG, WEBP).');
         return;
       }
 
-      showOCROverlay('Loading image...');
-      
-      try {
-        const worker = await Tesseract.createWorker('eng', 1, {
-          logger: m => {
-            if (m.status === 'recognizing text') {
-              const pct = Math.round((m.progress || 0) * 100);
-              updateOCRProgress(`Reading text... ${pct}%`);
-            } else if (m.status) {
-              updateOCRProgress(m.status);
-            }
-          }
-        });
+      showOCROverlay(isPdf ? 'Reading PDF...' : 'Loading image...');
 
-        updateOCRProgress('Running OCR engine...');
-        const { data: { text } } = await worker.recognize(file);
-        await worker.terminate();
+      try {
+        let text = '';
+        if (isPdf) {
+          text = await extractTextFromPDF(file);
+        } else {
+          text = await extractTextFromImage(file);
+        }
 
         hideOCROverlay();
 
         const items = parseOCRText(text);
         if (items.length === 0) {
           extractedOCRItems = [{
-            description: text.substring(0, 120).replace(/\n/g, ' ').trim() || 'Extracted item',
-            qty: 1,
-            rate: 0,
-            tax: 18
+            description: (text || 'Extracted item').substring(0, 120).replace(/\n/g, ' ').trim(),
+            qty: 1, rate: 0, tax: 18
           }];
         } else {
           extractedOCRItems = items;
@@ -745,30 +700,74 @@
         renderOCRReviewTable();
         showBillReviewModal();
       } catch (err) {
-        console.error('OCR Error:', err);
+        console.error('Bill read error:', err);
         hideOCROverlay();
-        alert('Failed to read the bill. Please try a clearer image or add items manually.');
+        alert('Failed to read the bill. Try a clearer PDF/image or add items manually.\n\n' + (err.message || ''));
       }
     }
 
-    function parseOCRText(text) {
-      const lines = text
-        .split(/\r?\n/)
-        .map(l => l.trim())
-        .filter(l => l.length > 2);
+    async function extractTextFromPDF(file) {
+      await window.pdfjsReady;
+      const pdfjsLib = window.pdfjsLib;
 
+      updateOCRProgress('Loading PDF document...');
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      let fullText = '';
+      const maxPages = Math.min(pdf.numPages, 5);
+
+      for (let pageNum = 1; pageNum <= maxPages; pageNum++) {
+        updateOCRProgress(`Extracting text from page ${pageNum}/${maxPages}...`);
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const pageText = content.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
+
+      // Scanned PDF fallback: render first page + OCR
+      if (fullText.trim().length < 40) {
+        updateOCRProgress('Scanned PDF detected – running OCR on first page...');
+        const page = await pdf.getPage(1);
+        const viewport = page.getViewport({ scale: 2.0 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const dataUrl = canvas.toDataURL('image/png');
+        fullText = await extractTextFromImage(dataUrl);
+      }
+
+      return fullText;
+    }
+
+    async function extractTextFromImage(source) {
+      updateOCRProgress('Running OCR engine...');
+      const worker = await Tesseract.createWorker('eng', 1, {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            updateOCRProgress(`Reading text... ${Math.round((m.progress || 0) * 100)}%`);
+          } else if (m.status) {
+            updateOCRProgress(m.status);
+          }
+        }
+      });
+      const { data: { text } } = await worker.recognize(source);
+      await worker.terminate();
+      return text;
+    }
+
+    function parseOCRText(text) {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 2);
       const items = [];
       const priceRegex = /(?:₹|Rs\.?|INR)?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?|\d+\.\d{1,2}|\d+)/i;
       const qtyRegex = /(?:qty|quantity|x|×)\s*[:=]?\s*(\d+)/i;
       const trailingQtyPrice = /(\d+)\s*[xX×]\s*(?:₹|Rs\.?)?\s*(\d+(?:\.\d{1,2})?)/;
       const trailingPrice = /(?:₹|Rs\.?)\s*(\d+(?:\.\d{1,2})?)\s*$/;
 
-      for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
-
-        if (/^(total|subtotal|grand total|gst|cgst|sgst|igst|tax|invoice|bill|date|phone|email|address|thank|visit|cash|card|paid)/i.test(line)) {
-          continue;
-        }
+      for (const line of lines) {
+        if (/^(total|subtotal|grand total|gst|cgst|sgst|igst|tax|invoice|bill|date|phone|email|address|thank|visit|cash|card|paid|from|bill to|seller|buyer)/i.test(line)) continue;
         if (line.length < 4) continue;
 
         let description = line;
@@ -786,7 +785,6 @@
             rate = parseFloat(priceMatch[1].replace(/,/g, '')) || 0;
             description = line.replace(priceMatch[0], '').trim();
           }
-
           const qtyMatch = line.match(qtyRegex);
           if (qtyMatch) {
             qty = parseInt(qtyMatch[1]) || 1;
@@ -794,18 +792,10 @@
           }
         }
 
-        description = description
-          .replace(/[|•·]/g, ' ')
-          .replace(/\s{2,}/g, ' ')
-          .trim();
+        description = description.replace(/[|•·]/g, ' ').replace(/\s{2,}/g, ' ').trim();
 
         if (description.length >= 3 && /[a-zA-Z]/.test(description) && rate >= 0) {
-          items.push({
-            description: description.substring(0, 80),
-            qty: qty,
-            rate: rate,
-            tax: 18
-          });
+          items.push({ description: description.substring(0, 80), qty: qty, rate: rate, tax: 18 });
         }
       }
 
@@ -818,7 +808,6 @@
           unique.push(item);
         }
       }
-
       return unique.slice(0, 25);
     }
 
@@ -827,22 +816,18 @@
       document.getElementById('ocrOverlay').classList.add('flex');
       updateOCRProgress(msg || 'Processing...');
     }
-
     function hideOCROverlay() {
       document.getElementById('ocrOverlay').classList.add('hidden');
       document.getElementById('ocrOverlay').classList.remove('flex');
     }
-
     function updateOCRProgress(msg) {
       const el = document.getElementById('ocrProgressText');
       if (el) el.textContent = msg;
     }
-
     function showBillReviewModal() {
       document.getElementById('billReviewModal').classList.remove('hidden');
       document.getElementById('billReviewModal').classList.add('flex');
     }
-
     function hideBillReviewModal() {
       document.getElementById('billReviewModal').classList.add('hidden');
       document.getElementById('billReviewModal').classList.remove('flex');
@@ -852,41 +837,19 @@
     function renderOCRReviewTable() {
       const tbody = document.getElementById('ocrItemsBody');
       tbody.innerHTML = '';
-
       if (extractedOCRItems.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-400">No items could be extracted. Try a clearer photo.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-400">No items extracted. Try a clearer file.</td></tr>`;
         return;
       }
-
       extractedOCRItems.forEach((item, idx) => {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50';
         tr.innerHTML = `
-          <td class="p-2">
-            <input type="text" value="${escapeHtml(item.description)}" 
-                   class="w-full p-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-purple-500"
-                   onchange="extractedOCRItems[${idx}].description = this.value">
-          </td>
-          <td class="p-2">
-            <input type="number" value="${item.qty}" min="1" 
-                   class="w-full p-2 border border-gray-200 rounded-lg text-sm text-center outline-none focus:border-purple-500"
-                   onchange="extractedOCRItems[${idx}].qty = parseInt(this.value) || 1">
-          </td>
-          <td class="p-2">
-            <input type="number" value="${item.rate}" min="0" step="0.01" 
-                   class="w-full p-2 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-purple-500"
-                   onchange="extractedOCRItems[${idx}].rate = parseFloat(this.value) || 0">
-          </td>
-          <td class="p-2">
-            <input type="number" value="${item.tax}" min="0" max="100" step="0.01" 
-                   class="w-full p-2 border border-gray-200 rounded-lg text-sm text-center outline-none focus:border-purple-500"
-                   onchange="extractedOCRItems[${idx}].tax = parseFloat(this.value) || 18">
-          </td>
-          <td class="p-2 text-center">
-            <button onclick="removeOCRItem(${idx})" class="w-7 h-7 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50">
-              <i class="fas fa-trash-alt text-xs"></i>
-            </button>
-          </td>
+          <td class="p-2"><input type="text" value="${escapeHtml(item.description)}" class="w-full p-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-purple-500" onchange="extractedOCRItems[${idx}].description = this.value"></td>
+          <td class="p-2"><input type="number" value="${item.qty}" min="1" class="w-full p-2 border border-gray-200 rounded-lg text-sm text-center outline-none focus:border-purple-500" onchange="extractedOCRItems[${idx}].qty = parseInt(this.value) || 1"></td>
+          <td class="p-2"><input type="number" value="${item.rate}" min="0" step="0.01" class="w-full p-2 border border-gray-200 rounded-lg text-sm text-right outline-none focus:border-purple-500" onchange="extractedOCRItems[${idx}].rate = parseFloat(this.value) || 0"></td>
+          <td class="p-2"><input type="number" value="${item.tax}" min="0" max="100" step="0.01" class="w-full p-2 border border-gray-200 rounded-lg text-sm text-center outline-none focus:border-purple-500" onchange="extractedOCRItems[${idx}].tax = parseFloat(this.value) || 18"></td>
+          <td class="p-2 text-center"><button onclick="removeOCRItem(${idx})" class="w-7 h-7 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><i class="fas fa-trash-alt text-xs"></i></button></td>
         `;
         tbody.appendChild(tr);
       });
@@ -898,11 +861,7 @@
     }
 
     function escapeHtml(str) {
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
     function addOCRItemsToTable() {
@@ -910,9 +869,7 @@
         alert('No items to add.');
         return;
       }
-
       const tbody = document.querySelector('#itemsTable tbody');
-
       if (tbody.rows.length === 1) {
         const firstDesc = tbody.rows[0].querySelector('td:nth-child(1) input');
         const firstRate = tbody.rows[0].querySelector('.rateInput');
@@ -923,7 +880,6 @@
 
       extractedOCRItems.forEach(item => {
         if (!item.description || !item.description.trim()) return;
-
         const row = document.createElement('tr');
         row.className = "hover:bg-gray-50/50 transition-colors group";
         row.innerHTML = `
@@ -936,10 +892,9 @@
         `;
         tbody.appendChild(row);
       });
-
       calculateTotal();
       hideBillReviewModal();
-      alert(`✅ ${extractedOCRItems.length} item(s) added to the table. Review quantities & rates, then save the document.`);
+      alert(`✅ ${extractedOCRItems.length} item(s) added. Review & save the document.`);
     }
 
     window.onload = async function() {
