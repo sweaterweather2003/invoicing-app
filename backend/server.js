@@ -9,6 +9,10 @@ const app = express();
 
 // Import Controllers
 const emailController = require('./controllers/emailController');
+const mobileEmailController = require('./controllers/mobileEmailController');
+const {
+  authenticateMobileFirebase,
+} = require('./middleware/mobileFirebaseAuth');
 
 // Middleware
 app.use(cors());
@@ -29,6 +33,11 @@ app.use(express.static(path.join(__dirname, '../frontend')));
 app.post('/api/send-document', emailController.sendDocument);           // ← Main route used by RFQ page
 app.post('/api/documents/send-test', emailController.sendDocument);     // ← Your existing test route
 app.post('/api/documents/:documentId/send', emailController.sendDocument);
+app.post(
+  '/api/firebase/documents/:documentId/send-email',
+  authenticateMobileFirebase,
+  mobileEmailController.sendMobileDocument
+);
 
 // ===================== OTHER ROUTES =====================
 app.use('/api/auth', require('./routes/auth'));
