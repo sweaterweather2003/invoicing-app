@@ -13,7 +13,10 @@ const emailController = require('./controllers/emailController');
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
-
+const mobileEmailController = require('./controllers/mobileEmailController');
+const {
+  authenticateMobileFirebase,
+} = require('./middleware/mobileFirebaseAuth');
 // Disable caching during development
 app.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -38,15 +41,16 @@ app.use('/api/clients', require('./routes/clients'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/recurring', require('./routes/recurring'));
-
+app.post(
+  '/api/firebase/documents/:documentId/send-email',
+  authenticateMobileFirebase,
+  mobileEmailController.sendMobileDocument
+);
 // Root Route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
 });
-const mobileEmailController = require('./controllers/mobileEmailController');
-const {
-  authenticateMobileFirebase,
-} = require('./middleware/mobileFirebaseAuth');
+
 // Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
