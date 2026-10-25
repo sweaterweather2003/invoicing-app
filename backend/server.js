@@ -43,7 +43,10 @@ app.use('/api/recurring', require('./routes/recurring'));
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/dashboard.html'));
 });
-
+const mobileEmailController = require('./controllers/mobileEmailController');
+const {
+  authenticateMobileFirebase,
+} = require('./middleware/mobileFirebaseAuth');
 // Start Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
